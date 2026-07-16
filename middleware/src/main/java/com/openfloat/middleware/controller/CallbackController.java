@@ -1,50 +1,67 @@
 package com.openfloat.middleware.controller;
 
-import com.openfloat.middleware.dto.MpesaCallbackRequest;
-import com.openfloat.middleware.dto.MpesaCallbackResponse;
-import com.openfloat.middleware.dto.MpesaConfirmationRequest;
-import com.openfloat.middleware.service.CallbackService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import com.openfloat.middleware.dto.StkCallbackResponse;
+import com.openfloat.middleware.model.MpesaTransaction;
+import com.openfloat.middleware.repository.TransactionRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
 
-@Slf4j
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/v1/callbacks")
-@RequiredArgsConstructor
 public class CallbackController {
 
-    private final CallbackService callbackService;
+    private final TransactionRepository transactionRepository;
 
-    // --- Existing C2B Endpoints ---
-
-    @PostMapping("/validation")
-    public ResponseEntity<MpesaCallbackResponse> handleValidationCallback(@RequestBody MpesaCallbackRequest request) {
-        MpesaCallbackResponse response = callbackService.validatePayment(request);
-        return ResponseEntity.ok(response);
+    // Constructor Injection
+    public CallbackController(TransactionRepository transactionRepository) {
+        this.transactionRepository = transactionRepository;
     }
 
-    @PostMapping("/confirmation")
-    public ResponseEntity<Map<String, String>> handleConfirmationCallback(@RequestBody MpesaConfirmationRequest request) {
-        String result = callbackService.confirmPayment(request);
+    @PostMapping("/stk")
+    public ResponseEntity<String> handleStkCallback(@RequestBody StkCallbackResponse payload) {
         
-        // Safaricom expects a simple JSON acknowledgment for confirmations to stop their retry mechanisms
-        return ResponseEntity.ok(Map.of("ResultCode", "0", "ResultDesc", result));
-    }
+        StkCallbackResponse.StkCallback callbackData = payload.getBody().getStkCallback();
+        
+        // Safaricom uses CheckoutRequestID as the unique identifier for the transaction session
+        String checkoutRequestId = callbackData.getCheckoutRequestId();
+        int resultCode = callbackData.getResultCode();
 
-    // --- NEW: STK Push Callback Endpoint ---
+        // 1. Find the pending transaction in the database
+        // (Assuming you saved the transaction when the STK push was initially triggered)
+        Optional<MpesaTransaction> transactionOptional = transactionRepository.findById(checkoutRequestId);
 
-    @PostMapping("/stk-push")
-    public ResponseEntity<String> handleStkCallback(@RequestBody String payload) {
-        
-        // For right now, we will just print the raw JSON to the terminal
-        // so you can see exactly what Safaricom sends back.
-        log.info("RECEIVED SAFARICOM STK PUSH CALLBACK: \n{}", payload);
-        
-        // You must ALWAYS return a 200 OK to Safaricom immediately.
-        // If you don't, Safaricom assumes the callback failed and will keep spamming your server.
-        return ResponseEntity.ok("Acknowledged");
+        if (transactionOptional.isPresent()) {
+            MpesaTransaction transaction = transactionOptional.get();
+
+            // 2. Evaluate the ResultCode from Safaricom
+            if (resultCode == 0) {
+                // Payment was successful
+                transaction.setStatus("PAID");
+                
+                // Extract the actual M-Pesa receipt string (e.g., "NLJ7RT61SV") from the metadata array
+                if (callbackData.getCallbackMetadata() != null) {
+                    for (StkCallbackResponse.Item item : callbackData.getCallbackMetadata().getItem()) {
+                        if ("MpesaReceiptNumber".equals(item.getName())) {
+                            transaction.setMpesaRef(item.getValue().toString());
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Payment failed (e.g., user cancelled, timeout, insufficient funds)
+                transaction.setStatus("FAILED");
+            }
+
+            // 3. Save the updated status back to the database
+            transactionRepository.save(transaction);
+        } else {
+            // In a production environment, you would log this to a Dead Letter Queue (DLQ)
+            System.out.println("Received callback for unknown transaction: " + checkoutRequestId);
+        }
+
+        // 4. Safaricom expects a generic success acknowledgment so they stop retrying
+        return ResponseEntity.ok("{\"ResultCode\": 0, \"ResultDesc\": \"Accepted\"}");
     }
 }
