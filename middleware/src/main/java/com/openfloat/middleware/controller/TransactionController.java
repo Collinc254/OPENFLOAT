@@ -3,7 +3,6 @@ package com.openfloat.middleware.controller;
 import com.openfloat.middleware.model.MpesaTransaction;
 import com.openfloat.middleware.repository.TransactionRepository;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,8 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/transactions")
-@CrossOrigin(origins = "*") // Crucial: Allows your local Vite server to fetch data without CORS blocks
+@RequestMapping("/api/v1/transactions") 
 public class TransactionController {
 
     // 1. Mark the field as final
