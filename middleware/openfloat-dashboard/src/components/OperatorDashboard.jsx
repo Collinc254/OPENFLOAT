@@ -147,6 +147,8 @@ export default function OperatorDashboard() {
     setMessage('');
 
     try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+      
       // Strip spaces out of the formatted phone number for the API payload
       const cleanPhone = phone.replace(/\s/g, '');
       const txRef = `INV-${Date.now()}`;
@@ -155,10 +157,21 @@ export default function OperatorDashboard() {
         ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef }
         : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef };
 
-      // Simulated initial API Gateway request delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       if (processingMode === 'single') {
+        // --- REAL API CALL TO SPRING BOOT ---
+        // Verify this path matches your Java backend endpoint for STK pushes
+        const response = await fetch(`${API_BASE_URL}/api/v1/stk-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error('Server rejected the STK push request');
+        }
+
         // Shift state to trigger the polling useEffect
         setStatus('polling');
         setActiveTxRef(txRef);
@@ -166,6 +179,8 @@ export default function OperatorDashboard() {
           ? 'STK Push sent to device. Awaiting customer PIN entry...' 
           : 'Processing B2C Disbursement. Awaiting Safaricom confirmation...');
       } else {
+        // Simulate batch API request (Update this later when your batch endpoint is ready)
+        await new Promise(resolve => setTimeout(resolve, 1000));
         setStatus('success');
         setMessage(`Batch ${transactionType} queued successfully. Processing ${batchData.length} records.`);
       }
