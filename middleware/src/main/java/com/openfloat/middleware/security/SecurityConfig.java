@@ -16,7 +16,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -33,9 +32,18 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable()) // Disable CSRF since we are using JWTs
             .cors(cors -> cors.configure(http)) // Allow your React frontend to connect
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll() // Open the login endpoints
-                .requestMatchers("/**/callback").permitAll() // CRITICAL: Open Daraja callbacks
-                .anyRequest().authenticated() // Lock down all other endpoints
+                
+                // 1. Allow Auth routes (Critical so you can register and login)
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                
+                // 2. Allow STK Push trigger endpoints
+                .requestMatchers("/api/v1/stk/**").permitAll()
+                
+               // 3. CRITICAL: Open Daraja callbacks (Cleaned up to prevent parsing errors)
+.requestMatchers("/api/v1/callback/**").permitAll()
+                
+                // 4. Lock down all other endpoints
+                .anyRequest().authenticated() 
             )
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Tell Spring we are strictly using JWTs
             .authenticationProvider(authenticationProvider())
