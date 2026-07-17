@@ -9,8 +9,9 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                // Allows traffic from standard Vite and Create React App local servers
-                .allowedOrigins("http://localhost:5173", "http://localhost:3000") 
+                // Replaced allowedOrigins with allowedOriginPatterns to fix the Render crash
+                // This allows both your Vercel URL and local Vite server to connect securely
+                .allowedOriginPatterns("*") 
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
