@@ -1,5 +1,7 @@
 package com.openfloat.middleware.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openfloat.middleware.dto.DarajaStkPushPayload;
 import com.openfloat.middleware.dto.DarajaStkPushResponse;
 import com.openfloat.middleware.dto.StkPushRequest;
@@ -43,6 +45,9 @@ public class StkPushService {
 
     // RestTemplate is Spring's default HTTP client for making external API calls
     private final RestTemplate restTemplate = new RestTemplate();
+    
+    // NEW: Jackson ObjectMapper to parse Safaricom's nested JSON
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         // 1. Get the temporary security token
@@ -84,6 +89,50 @@ public class StkPushService {
         } catch (Exception e) {
             log.error("Daraja STK Push Failed: {}", e.getMessage());
             throw new RuntimeException("Failed to initiate STK Push with Safaricom.");
+        }
+    }
+
+    // NEW: Safaricom Callback Parser
+    public void processCallback(String rawJson) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(rawJson);
+            JsonNode stkCallback = rootNode.path("Body").path("stkCallback");
+
+            String checkoutRequestID = stkCallback.path("CheckoutRequestID").asText();
+            int resultCode = stkCallback.path("ResultCode").asInt();
+            String resultDesc = stkCallback.path("ResultDesc").asText();
+
+            if (resultCode == 0) {
+                // Payment was successful!
+                JsonNode items = stkCallback.path("CallbackMetadata").path("Item");
+                String mpesaReceiptNumber = "";
+                
+                // Safaricom sends metadata as an array of key-value pairs, so we loop to find the receipt
+                for (JsonNode item : items) {
+                    if ("MpesaReceiptNumber".equals(item.path("Name").asText())) {
+                        mpesaReceiptNumber = item.path("Value").asText();
+                        break;
+                    }
+                }
+                
+                log.info("PAYMENT SUCCESS! Receipt: {}, Checkout ID: {}", mpesaReceiptNumber, checkoutRequestID);
+                
+                // TODO: DATABASE UPDATE LOGIC HERE
+                // 1. Use your Repository to find the transaction where CheckoutRequestID matches this one
+                // 2. Update its status to "PAID"
+                // 3. Save the mpesaReceiptNumber to the transaction record
+                
+            } else {
+                // Payment failed (user cancelled, wrong PIN, insufficient funds, etc.)
+                log.warn("PAYMENT FAILED! Reason: {}, Checkout ID: {}", resultDesc, checkoutRequestID);
+                
+                // TODO: DATABASE UPDATE LOGIC HERE
+                // 1. Use your Repository to find the transaction where CheckoutRequestID matches this one
+                // 2. Update its status to "FAILED"
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to parse Daraja callback JSON: {}", e.getMessage());
         }
     }
 

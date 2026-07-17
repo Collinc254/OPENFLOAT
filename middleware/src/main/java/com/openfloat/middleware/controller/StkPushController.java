@@ -27,13 +27,16 @@ public class StkPushController {
         return ResponseEntity.ok(response);
     }
 
-    // NEW: The Daraja Callback Receiver
+    // NEW: The Daraja Callback Receiver (UPDATED to parse and process the callback payload)
     @PostMapping("/callback")
     public ResponseEntity<String> handleDarajaCallback(@RequestBody String callbackPayload) {
         // 1. Log the raw JSON from Safaricom so we can see it in Render logs
         log.info("DARAJA CALLBACK RECEIVED: {}", callbackPayload);
         
-        // 2. You MUST return a 200 OK success message to Safaricom, otherwise they will keep retrying
+        // 2. Parse the payload and trigger database updates
+        stkPushService.processCallback(callbackPayload);
+
+        // 3. Return a 200 OK success message to Safaricom so they stop retrying
         return ResponseEntity.ok("Callback received successfully");
     }
 }
