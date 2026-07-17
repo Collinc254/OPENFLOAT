@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openfloat.middleware.dto.DarajaStkPushPayload;
 import com.openfloat.middleware.dto.DarajaStkPushResponse;
 import com.openfloat.middleware.dto.StkPushRequest;
+import com.openfloat.middleware.model.MpesaTransaction;
+import com.openfloat.middleware.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -46,8 +49,11 @@ public class StkPushService {
     // RestTemplate is Spring's default HTTP client for making external API calls
     private final RestTemplate restTemplate = new RestTemplate();
     
-    // NEW: Jackson ObjectMapper to parse Safaricom's nested JSON
+    // Jackson ObjectMapper to parse Safaricom's nested JSON
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // NEW: Inject the database repository
+    private final TransactionRepository transactionRepository;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         // 1. Get the temporary security token
@@ -85,14 +91,33 @@ public class StkPushService {
         try {
             ResponseEntity<DarajaStkPushResponse> response = restTemplate.postForEntity(
                     stkPushUrl, entity, DarajaStkPushResponse.class);
-            return response.getBody();
+            
+            DarajaStkPushResponse pushResponse = response.getBody();
+
+            // NEW: Save the initial PENDING transaction to the database
+            if (pushResponse != null) {
+                MpesaTransaction pendingTrx = new MpesaTransaction();
+                pendingTrx.setId(request.invoiceRef()); // e.g., INV-123456789
+                pendingTrx.setPhone(request.msisdn());
+                pendingTrx.setAmount(request.amount());
+                pendingTrx.setType("STK Push");
+                pendingTrx.setStatus("PENDING");
+                pendingTrx.setDate(LocalDateTime.now());
+                
+                // IMPORTANT: If your DarajaStkPushResponse uses a different getter name (like getCheckoutRequestID()), update it here.
+                pendingTrx.setCheckoutRequestId(pushResponse.checkoutRequestId()); 
+                
+                transactionRepository.save(pendingTrx);
+            }
+
+            return pushResponse;
         } catch (Exception e) {
             log.error("Daraja STK Push Failed: {}", e.getMessage());
             throw new RuntimeException("Failed to initiate STK Push with Safaricom.");
         }
     }
 
-    // NEW: Safaricom Callback Parser
+    // Safaricom Callback Parser and Database Updater
     public void processCallback(String rawJson) {
         try {
             JsonNode rootNode = objectMapper.readTree(rawJson);
@@ -102,37 +127,47 @@ public class StkPushService {
             int resultCode = stkCallback.path("ResultCode").asInt();
             String resultDesc = stkCallback.path("ResultDesc").asText();
 
-            if (resultCode == 0) {
-                // Payment was successful!
-                JsonNode items = stkCallback.path("CallbackMetadata").path("Item");
-                String mpesaReceiptNumber = "";
-                
-                // Safaricom sends metadata as an array of key-value pairs, so we loop to find the receipt
-                for (JsonNode item : items) {
-                    if ("MpesaReceiptNumber".equals(item.path("Name").asText())) {
-                        mpesaReceiptNumber = item.path("Value").asText();
-                        break;
+            // NEW: Look up the transaction in the database using the Checkout Request ID
+            Optional<MpesaTransaction> optionalTrx = transactionRepository.findByCheckoutRequestId(checkoutRequestID);
+
+            if (optionalTrx.isPresent()) {
+                MpesaTransaction trx = optionalTrx.get();
+
+                if (resultCode == 0) {
+                    // Payment was successful! Extract the receipt number.
+                    JsonNode items = stkCallback.path("CallbackMetadata").path("Item");
+                    String mpesaReceiptNumber = "";
+                    
+                    for (JsonNode item : items) {
+                        if ("MpesaReceiptNumber".equals(item.path("Name").asText())) {
+                            mpesaReceiptNumber = item.path("Value").asText();
+                            break;
+                        }
                     }
+                    
+                    log.info("PAYMENT SUCCESS! Database updated. Receipt: {}, Checkout ID: {}", mpesaReceiptNumber, checkoutRequestID);
+                    
+                    // Update database entity to PAID
+                    trx.setStatus("PAID");
+                    trx.setMpesaRef(mpesaReceiptNumber);
+                    
+                } else {
+                    // Payment failed
+                    log.warn("PAYMENT FAILED! Database updated. Reason: {}, Checkout ID: {}", resultDesc, checkoutRequestID);
+                    
+                    // Update database entity to FAILED
+                    trx.setStatus("FAILED");
                 }
-                
-                log.info("PAYMENT SUCCESS! Receipt: {}, Checkout ID: {}", mpesaReceiptNumber, checkoutRequestID);
-                
-                // TODO: DATABASE UPDATE LOGIC HERE
-                // 1. Use your Repository to find the transaction where CheckoutRequestID matches this one
-                // 2. Update its status to "PAID"
-                // 3. Save the mpesaReceiptNumber to the transaction record
-                
+
+                // Commit the status change to the database
+                transactionRepository.save(trx);
+
             } else {
-                // Payment failed (user cancelled, wrong PIN, insufficient funds, etc.)
-                log.warn("PAYMENT FAILED! Reason: {}, Checkout ID: {}", resultDesc, checkoutRequestID);
-                
-                // TODO: DATABASE UPDATE LOGIC HERE
-                // 1. Use your Repository to find the transaction where CheckoutRequestID matches this one
-                // 2. Update its status to "FAILED"
+                log.error("CRITICAL ERROR: Received callback for Checkout ID {} but it was not found in the database!", checkoutRequestID);
             }
 
         } catch (Exception e) {
-            log.error("Failed to parse Daraja callback JSON: {}", e.getMessage());
+            log.error("Failed to parse Daraja callback JSON or update database: {}", e.getMessage());
         }
     }
 
