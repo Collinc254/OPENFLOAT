@@ -159,8 +159,8 @@ export default function OperatorDashboard() {
 
       if (processingMode === 'single') {
         // --- REAL API CALL TO SPRING BOOT ---
-        // Verify this path matches your Java backend endpoint for STK pushes
-        const response = await fetch(`${API_BASE_URL}/api/v1/stk-push`, {
+        // Path corrected to match your Java @RequestMapping and @PostMapping
+        const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
