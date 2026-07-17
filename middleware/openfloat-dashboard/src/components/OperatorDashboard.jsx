@@ -153,13 +153,13 @@ export default function OperatorDashboard() {
       const cleanPhone = phone.replace(/\s/g, '');
       const txRef = `INV-${Date.now()}`;
       
+      // ADDED: tenantId is now included in the payload to satisfy the Java @Valid constraint
       const payload = processingMode === 'single' 
-        ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef }
-        : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef };
+        ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef, tenantId: "ORG-001" }
+        : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
 
       if (processingMode === 'single') {
         // --- REAL API CALL TO SPRING BOOT ---
-        // Path corrected to match your Java @RequestMapping and @PostMapping
         const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
           headers: {
