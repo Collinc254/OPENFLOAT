@@ -13,21 +13,18 @@ import java.time.LocalDateTime;
 public class MpesaTransaction {
 
     @Id
-    private String id; // Maps to your system ID, e.g., INV-123456789
+    private String id;
 
     private String mpesaRef;
     private String phone;
     private BigDecimal amount;
     private String type;
     private String status;
-    
-    // NEW: Safaricom's tracking ID
     private String checkoutRequestId;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm")
     private LocalDateTime date;
 
-    // Constructors
     public MpesaTransaction() {}
 
     public MpesaTransaction(String id, String mpesaRef, String phone, BigDecimal amount, String type, String status, String checkoutRequestId, LocalDateTime date) {
@@ -41,7 +38,6 @@ public class MpesaTransaction {
         this.date = date;
     }
 
-    // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 

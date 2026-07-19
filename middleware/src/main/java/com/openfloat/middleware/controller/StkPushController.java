@@ -2,12 +2,16 @@ package com.openfloat.middleware.controller;
 
 import com.openfloat.middleware.dto.DarajaStkPushResponse;
 import com.openfloat.middleware.dto.StkPushRequest;
+import com.openfloat.middleware.repository.TransactionRepository;
 import com.openfloat.middleware.service.StkPushService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -16,27 +20,39 @@ import org.springframework.web.bind.annotation.*;
 public class StkPushController {
 
     private final StkPushService stkPushService;
+    private final TransactionRepository transactionRepository;
 
     @PostMapping("/stk-push")
     public ResponseEntity<DarajaStkPushResponse> initiateStkPush(@Valid @RequestBody StkPushRequest request) {
-        
-        // Pass the sanitized request to our perfectly built service
         DarajaStkPushResponse response = stkPushService.sendPush(request);
-        
-        // Return Safaricom's immediate tracking ID back to the client
         return ResponseEntity.ok(response);
     }
 
-    // NEW: The Daraja Callback Receiver (UPDATED to parse and process the callback payload)
     @PostMapping("/callback")
     public ResponseEntity<String> handleDarajaCallback(@RequestBody String callbackPayload) {
-        // 1. Log the raw JSON from Safaricom so we can see it in Render logs
         log.info("DARAJA CALLBACK RECEIVED: {}", callbackPayload);
-        
-        // 2. Parse the payload and trigger database updates
         stkPushService.processCallback(callbackPayload);
-
-        // 3. Return a 200 OK success message to Safaricom so they stop retrying
         return ResponseEntity.ok("Callback received successfully");
+    }
+
+    @GetMapping("/status/{checkoutRequestId}")
+    public ResponseEntity<?> getPaymentStatus(@PathVariable String checkoutRequestId) {
+        return transactionRepository.findByCheckoutRequestId(checkoutRequestId)
+                .map(txn -> {
+                    Map<String, String> response = new HashMap<>();
+                    String currentStatus = txn.getStatus();
+                    
+                    if ("SUCCESS".equalsIgnoreCase(currentStatus) || "0".equals(currentStatus)) {
+                        response.put("status", "SUCCESS");
+                        response.put("receiptNumber", txn.getMpesaRef()); 
+                    } else if (currentStatus != null && !currentStatus.equalsIgnoreCase("PENDING")) {
+                        response.put("status", "FAILED");
+                    } else {
+                        response.put("status", "PENDING");
+                    }
+                    
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.ok(Map.of("status", "PENDING"))); 
     }
 }
