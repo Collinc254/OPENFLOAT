@@ -9,19 +9,37 @@ export default function Login({ onSuccessfulLogin }) {
     e.preventDefault();
     setStatus('loading');
 
-    // Simulating the LDAP/AD OAuth2 token exchange delay
-    setTimeout(() => {
-      if (username && password.length >= 6) {
-        // Mock successful login payload
-        onSuccessfulLogin({
-          username: username,
-          role: 'Operator', // In production, this comes from the JWT/LDAP claims
-          token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-        });
-      } else {
-        setStatus('error');
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      
+      // Send real credentials to your Spring Boot backend
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        // If the backend sends 401 Unauthorized, throw an error to trigger the red box
+        throw new Error('Authentication failed');
       }
-    }, 1200);
+
+      // If successful, extract the real JWT token
+      const data = await response.json();
+
+      // Pass the real token to the main app layout
+      onSuccessfulLogin({
+        username: username,
+        role: 'ADMIN', 
+        token: data.token
+      });
+
+    } catch (error) {
+      console.error('Login Error:', error);
+      setStatus('error'); // Triggers the red error banner
+    }
   };
 
   return (
@@ -40,22 +58,22 @@ export default function Login({ onSuccessfulLogin }) {
           
           <div className="mb-6">
             <h3 className="text-lg font-medium text-slate-900">Staff Authentication</h3>
-            <p className="text-sm text-slate-500">Sign in with your Active Directory credentials.</p>
+            <p className="text-sm text-slate-500">Sign in with your secure credentials.</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleAuth}>
             <div>
               <label className="block text-sm font-medium text-slate-700">
-                Corporate Username
+                Admin Username
               </label>
               <div className="mt-1">
                 <input
                   type="text"
                   required
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => { setUsername(e.target.value); setStatus('idle'); }}
                   className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-900 focus:border-slate-900 sm:text-sm"
-                  placeholder="e.g. jdoe"
+                  placeholder="Admin account"
                 />
               </div>
             </div>
@@ -69,7 +87,7 @@ export default function Login({ onSuccessfulLogin }) {
                   type="password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setStatus('idle'); }}
                   className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-900 focus:border-slate-900 sm:text-sm"
                 />
               </div>
@@ -77,7 +95,7 @@ export default function Login({ onSuccessfulLogin }) {
 
             {status === 'error' && (
               <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-100">
-                Authentication failed. Please verify your Active Directory credentials.
+                Authentication failed. Incorrect username or password.
               </div>
             )}
 
@@ -94,7 +112,7 @@ export default function Login({ onSuccessfulLogin }) {
                 {status === 'loading' ? (
                   <span className="flex items-center gap-2">
                     <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Authenticating via LDAP...
+                    Verifying Credentials...
                   </span>
                 ) : (
                   'Sign In'
