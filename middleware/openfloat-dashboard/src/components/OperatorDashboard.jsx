@@ -30,7 +30,7 @@ export default function OperatorDashboard() {
     let formatted = cleaned;
     if (cleaned.length > 3) formatted = cleaned.slice(0, 3) + ' ' + cleaned.slice(3);
     if (cleaned.length > 6) formatted = formatted.slice(0, 7) + ' ' + formatted.slice(7);
-    if (cleaned.length > 9) formatted = formatted.slice(0, 11) + ' ' + formatted.slice(11, 14); // Cap length
+    if (cleaned.length > 9) formatted = formatted.slice(0, 11) + ' ' + formatted.slice(11, 14);
 
     setPhone(formatted);
 
@@ -95,35 +95,35 @@ export default function OperatorDashboard() {
     let timeout;
 
     if (status === 'polling' && activeTxRef) {
-      // Point this to your Spring Boot local server
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       pollInterval = setInterval(() => {
-        fetch(`${API_BASE_URL}/api/v1/transactions/${activeTxRef}`)
+        // UPDATED: Now hitting your new status endpoint with the CheckoutRequestID
+        fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`)
           .then((res) => {
             if (!res.ok) throw new Error('Transaction not found yet');
             return res.json();
           })
           .then((data) => {
-            // Check if the webhook handler updated the status in the DB
-            if (data.status === 'PAID') {
+            // UPDATED: Checking for the specific SUCCESS status and receipt variable from Spring Boot
+            if (data.status === 'SUCCESS') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('success');
-              setMessage(`Callback Received: Transaction ${data.mpesaRef} Confirmed!`);
+              // Outputting the exact string requested
+              setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
-              setMessage('Transaction Failed: Customer cancelled or insufficient funds.');
+              setMessage('Failed');
               setActiveTxRef(null);
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
       }, 3000); // Poll every 3 seconds
 
-      // Fail-safe timeout: Stop polling after 30 seconds
       timeout = setTimeout(() => {
         clearInterval(pollInterval);
         setStatus('error');
@@ -141,25 +141,22 @@ export default function OperatorDashboard() {
   // --- SUBMISSION LOGIC ---
   const handleExecute = async (e) => {
     e.preventDefault();
-    if (phoneError) return; // Prevent submission if validation fails
+    if (phoneError) return; 
     
     setStatus('loading');
     setMessage('');
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      // Strip spaces out of the formatted phone number for the API payload
       const cleanPhone = phone.replace(/\s/g, '');
       const txRef = `INV-${Date.now()}`;
       
-      // ADDED: tenantId is now included in the payload to satisfy the Java @Valid constraint
       const payload = processingMode === 'single' 
         ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef, tenantId: "ORG-001" }
         : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
 
       if (processingMode === 'single') {
-        // --- REAL API CALL TO SPRING BOOT ---
         const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
           headers: {
@@ -172,14 +169,15 @@ export default function OperatorDashboard() {
           throw new Error('Server rejected the STK push request');
         }
 
-        // Shift state to trigger the polling useEffect
+        // UPDATED: Extract Safaricom's tracking ID to use for polling
+        const responseData = await response.json();
+        const checkoutId = responseData.CheckoutRequestID || responseData.checkoutRequestID || responseData.checkoutRequestId;
+
         setStatus('polling');
-        setActiveTxRef(txRef);
-        setMessage(transactionType === 'STK Push' 
-          ? 'STK Push sent to device. Awaiting customer PIN entry...' 
-          : 'Processing B2C Disbursement. Awaiting Safaricom confirmation...');
+        // Set the active reference to Safaricom's tracking ID, not the local invoice ID
+        setActiveTxRef(checkoutId); 
+        setMessage('Awaiting customer PIN entry...'); 
       } else {
-        // Simulate batch API request (Update this later when your batch endpoint is ready)
         await new Promise(resolve => setTimeout(resolve, 1000));
         setStatus('success');
         setMessage(`Batch ${transactionType} queued successfully. Processing ${batchData.length} records.`);
