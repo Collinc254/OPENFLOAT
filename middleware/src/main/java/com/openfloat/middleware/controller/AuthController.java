@@ -10,38 +10,18 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
-@RequiredArgsConstructor // This creates the constructor for all 'final' fields automatically
+@RequiredArgsConstructor 
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
 
-    // --- NEW REGISTRATION ENDPOINT ---
-    @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody AuthRequest request) {
-        if (userRepository.findByUsername(request.username()).isPresent()) {
-            return ResponseEntity.badRequest().body("Error: Username is already taken!");
-        }
-
-        SystemUser newUser = new SystemUser();
-        newUser.setUsername(request.username());
-        newUser.setPassword(passwordEncoder.encode(request.password()));
-        newUser.setRole("USER");
-
-        userRepository.save(newUser);
-
-        return ResponseEntity.ok("User registered successfully!");
-    }
-
-    // --- EXISTING LOGIN ENDPOINT ---
+    // --- EXISTING LOGIN ENDPOINT (Registration removed for security) ---
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthRequest authRequest) {
         try {
