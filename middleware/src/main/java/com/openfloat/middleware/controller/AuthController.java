@@ -7,7 +7,7 @@ import com.openfloat.middleware.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -21,15 +21,15 @@ public class AuthController {
     private final CustomUserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
 
-    // --- EXISTING LOGIN ENDPOINT (Registration removed for security) ---
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthRequest authRequest) {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authRequest.username(), authRequest.password())
             );
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(401).body("Incorrect username or password");
+        } catch (AuthenticationException e) {
+            // FIXED: This now catches wrong passwords AND users who are not Admins
+            return ResponseEntity.status(401).body("Access Denied: Incorrect credentials or not an Admin.");
         }
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.username());

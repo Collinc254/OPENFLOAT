@@ -22,6 +22,12 @@ public class CustomUserDetailsService implements UserDetailsService {
         SystemUser systemUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+        // --- STRICT SECURITY LOCKDOWN ---
+        // Instantly block anyone who is not an ADMIN, even if their password is correct!
+        if (!"ADMIN".equalsIgnoreCase(systemUser.getRole())) {
+            throw new UsernameNotFoundException("Access Denied: You are not an Administrator.");
+        }
+
         // Convert our SystemUser into Spring Security's built-in User object
         return User.builder()
                 .username(systemUser.getUsername())
