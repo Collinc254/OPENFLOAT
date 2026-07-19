@@ -35,7 +35,6 @@ public class StkPushController {
         return ResponseEntity.ok("Callback received successfully");
     }
 
-    // The Status Endpoint for React Polling
     @GetMapping("/status/{checkoutRequestId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String checkoutRequestId) {
         return transactionRepository.findByCheckoutRequestId(checkoutRequestId)
@@ -45,10 +44,13 @@ public class StkPushController {
                     
                     if (currentStatus == null) {
                         response.put("status", "PENDING");
-                    } else if ("SUCCESS".equalsIgnoreCase(currentStatus) || "0".equals(currentStatus)) {
+                    } 
+                    // UPDATED: Now recognizes "PAID" as a valid success state!
+                    else if ("SUCCESS".equalsIgnoreCase(currentStatus) || "PAID".equalsIgnoreCase(currentStatus) || "COMPLETED".equalsIgnoreCase(currentStatus) || "0".equals(currentStatus)) {
                         response.put("status", "SUCCESS");
                         response.put("receiptNumber", txn.getMpesaRef()); 
-                    } else if ("FAILED".equalsIgnoreCase(currentStatus) || (currentStatus.matches("\\d+") && !"0".equals(currentStatus))) {
+                    } 
+                    else if ("FAILED".equalsIgnoreCase(currentStatus) || (currentStatus.matches("\\d+") && !"0".equals(currentStatus))) {
                         response.put("status", "FAILED");
                     } else {
                         response.put("status", "PENDING"); 
