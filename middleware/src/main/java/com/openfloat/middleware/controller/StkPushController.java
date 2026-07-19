@@ -35,6 +35,7 @@ public class StkPushController {
         return ResponseEntity.ok("Callback received successfully");
     }
 
+    // The Status Endpoint for React Polling
     @GetMapping("/status/{checkoutRequestId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String checkoutRequestId) {
         return transactionRepository.findByCheckoutRequestId(checkoutRequestId)
@@ -42,13 +43,15 @@ public class StkPushController {
                     Map<String, String> response = new HashMap<>();
                     String currentStatus = txn.getStatus();
                     
-                    if ("SUCCESS".equalsIgnoreCase(currentStatus) || "0".equals(currentStatus)) {
+                    if (currentStatus == null) {
+                        response.put("status", "PENDING");
+                    } else if ("SUCCESS".equalsIgnoreCase(currentStatus) || "0".equals(currentStatus)) {
                         response.put("status", "SUCCESS");
                         response.put("receiptNumber", txn.getMpesaRef()); 
-                    } else if (currentStatus != null && !currentStatus.equalsIgnoreCase("PENDING")) {
+                    } else if ("FAILED".equalsIgnoreCase(currentStatus) || (currentStatus.matches("\\d+") && !"0".equals(currentStatus))) {
                         response.put("status", "FAILED");
                     } else {
-                        response.put("status", "PENDING");
+                        response.put("status", "PENDING"); 
                     }
                     
                     return ResponseEntity.ok(response);
