@@ -6,6 +6,8 @@ import com.openfloat.middleware.repository.TransactionRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 @RestController
@@ -29,7 +31,6 @@ public class CallbackController {
         int resultCode = callbackData.getResultCode();
 
         // 1. Find the pending transaction in the database
-        // (Assuming you saved the transaction when the STK push was initially triggered)
         Optional<MpesaTransaction> transactionOptional = transactionRepository.findById(checkoutRequestId);
 
         if (transactionOptional.isPresent()) {
@@ -40,21 +41,43 @@ public class CallbackController {
                 // Payment was successful
                 transaction.setStatus("PAID");
                 
-                // Extract the actual M-Pesa receipt string (e.g., "NLJ7RT61SV") from the metadata array
-                if (callbackData.getCallbackMetadata() != null) {
+                // Extract ALL metadata from Safaricom's payload
+                if (callbackData.getCallbackMetadata() != null && callbackData.getCallbackMetadata().getItem() != null) {
                     for (StkCallbackResponse.Item item : callbackData.getCallbackMetadata().getItem()) {
-                        if ("MpesaReceiptNumber".equals(item.getName())) {
-                            transaction.setMpesaRef(item.getValue().toString());
-                            break;
+                        
+                        // Safety check in case Safaricom sends a null value
+                        if (item.getValue() == null) continue; 
+
+                        String itemName = item.getName();
+                        String itemValue = item.getValue().toString();
+
+                        switch (itemName) {
+                            case "MpesaReceiptNumber":
+                                transaction.setMpesaRef(itemValue);
+                                break;
+                            case "PhoneNumber":
+                                transaction.setPhone(itemValue);
+                                break;
+                            case "TransactionDate":
+                                try {
+                                    // Parse Safaricom's specific timestamp format (e.g., 20260720111507)
+                                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+                                    transaction.setDate(LocalDateTime.parse(itemValue, formatter));
+                                } catch (Exception e) {
+                                    // Fallback to current server time if Safaricom's date fails to parse
+                                    transaction.setDate(LocalDateTime.now());
+                                }
+                                break;
                         }
                     }
                 }
             } else {
                 // Payment failed (e.g., user cancelled, timeout, insufficient funds)
                 transaction.setStatus("FAILED");
+                transaction.setDate(LocalDateTime.now()); // Stamp the failure time
             }
 
-            // 3. Save the updated status back to the database
+            // 3. Save the comprehensively updated transaction back to the database
             transactionRepository.save(transaction);
         } else {
             // In a production environment, you would log this to a Dead Letter Queue (DLQ)

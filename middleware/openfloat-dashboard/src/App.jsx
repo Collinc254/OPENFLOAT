@@ -144,11 +144,11 @@ export default function App() {
         <div className="flex-1 p-8 overflow-y-auto bg-slate-50 relative">
           <div className="max-w-6xl mx-auto">
             
-          {/* The Switchboard: Render component based on state */}
+        {/* The Switchboard: Render component based on state */}
 {activeTab === 'operator' && <OperatorDashboard />}
 {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
 {activeTab === 'admin' && <AdminConsole />}
-{activeTab === 'viewer' && <AuditViewer />}
+{activeTab === 'viewer' && <AuditViewer token={user.token} />}
 
           </div>
         </div>

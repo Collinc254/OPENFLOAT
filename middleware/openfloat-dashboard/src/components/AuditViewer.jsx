@@ -1,18 +1,52 @@
 import { useState, useEffect } from 'react';
 
-export default function AuditViewer() {
+export default function AuditViewer({ token }) {
   const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Mocking immutable audit logs fetched from SIEM/Database
-    setLogs([
-      { id: 'EVT-001', timestamp: '2026-07-16 08:30:12', actor: 'SYSTEM', action: 'OAuth Token Generated', target: 'Gateway', status: 'SUCCESS' },
-      { id: 'EVT-002', timestamp: '2026-07-16 08:15:05', actor: 'collins (Admin)', action: 'Viewed Reversals', target: 'Finance Module', status: 'SUCCESS' },
-      { id: 'EVT-003', timestamp: '2026-07-16 08:14:22', actor: 'SYSTEM', action: 'C2B Callback Received', target: 'Webhook Handler', status: 'SUCCESS' },
-      { id: 'EVT-004', timestamp: '2026-07-16 07:55:10', actor: 'jdoe (Operator)', action: 'Initiated STK Push', target: 'M-Pesa API', status: 'SUCCESS' },
-      { id: 'EVT-005', timestamp: '2026-07-16 07:10:01', actor: 'UNKNOWN', action: 'Failed Login Attempt', target: 'Auth Service', status: 'DENIED' },
-    ]);
-  }, []);
+    const fetchAuditLogs = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+        
+        const response = await fetch(`${API_URL}/api/v1/audit-logs`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch live audit logs.');
+        }
+
+        const data = await response.json();
+
+        // Map backend Spring Boot entity fields to frontend table columns
+        const formattedData = data.map(log => ({
+          id: log.eventId || log.id || 'N/A',
+          timestamp: log.timestamp || 'Just now',
+          actor: log.actor || 'SYSTEM',
+          action: log.action || 'Unknown Action',
+          target: log.targetComponent || log.target || 'N/A',
+          status: log.status || 'UNKNOWN'
+        }));
+
+        setLogs(formattedData);
+      } catch (err) {
+        console.error('Audit Log connection error:', err.message);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchAuditLogs();
+    }
+  }, [token]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -25,6 +59,12 @@ export default function AuditViewer() {
           SECURE MODE: READ-ONLY
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium">
+          Error: {error} - Please verify the backend endpoint is running.
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
@@ -39,22 +79,39 @@ export default function AuditViewer() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm text-slate-700 font-mono">
-            {logs.map((log) => (
-              <tr key={log.id} className="hover:bg-slate-50 transition-colors text-xs">
-                <td className="px-6 py-3 whitespace-nowrap text-slate-500">{log.timestamp}</td>
-                <td className="px-6 py-3">{log.id}</td>
-                <td className="px-6 py-3 font-semibold text-slate-900">{log.actor}</td>
-                <td className="px-6 py-3">{log.action}</td>
-                <td className="px-6 py-3 text-slate-500">{log.target}</td>
-                <td className="px-6 py-3">
-                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase
-                    ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                  `}>
-                    {log.status}
-                  </span>
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="px-6 py-12 text-center text-slate-500 font-sans">
+                  <svg className="animate-spin h-6 w-6 text-slate-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Retrieving secure logs...
                 </td>
               </tr>
-            ))}
+            ) : logs.length === 0 && !error ? (
+              <tr>
+                <td colSpan="6" className="px-6 py-12 text-center text-slate-500 font-sans">
+                  No audit logs found in the database.
+                </td>
+              </tr>
+            ) : (
+              logs.map((log, index) => (
+                <tr key={log.id || index} className="hover:bg-slate-50 transition-colors text-xs">
+                  <td className="px-6 py-3 whitespace-nowrap text-slate-500">{log.timestamp}</td>
+                  <td className="px-6 py-3">{log.id}</td>
+                  <td className="px-6 py-3 font-semibold text-slate-900">{log.actor}</td>
+                  <td className="px-6 py-3">{log.action}</td>
+                  <td className="px-6 py-3 text-slate-500">{log.target}</td>
+                  <td className="px-6 py-3">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase font-sans
+                      ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : ''}
+                      ${log.status === 'DENIED' || log.status === 'FAILED' ? 'bg-red-100 text-red-800' : ''}
+                      ${log.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : ''}
+                    `}>
+                      {log.status}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
