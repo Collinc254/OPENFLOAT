@@ -16,7 +16,7 @@ public class InvoiceController {
 
     private final InvoiceService invoiceService;
 
-    @PostMapping
+    @PostMapping(consumes = "application/json", produces = "application/json")
     public ResponseEntity<InvoiceResponse> requestInvoice(@Valid @RequestBody InvoiceRequest request) {
         InvoiceResponse response = invoiceService.createInvoice(request);
         
