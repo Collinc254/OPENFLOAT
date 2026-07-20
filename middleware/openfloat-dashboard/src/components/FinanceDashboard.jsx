@@ -1,42 +1,59 @@
 import { useState, useEffect } from 'react';
 
-export default function FinanceDashboard() {
+// Accept the JWT token as a prop to bypass Spring Security
+export default function FinanceDashboard({ token }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // useEffect runs the moment this component is rendered on the screen
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
         
-        // Attempt to fetch live data from your Spring Boot backend
-        const response = await fetch(`${API_URL}/api/v1/transactions`);
+        // Include the Authorization Bearer token in the headers
+        const response = await fetch(`${API_URL}/api/v1/transactions`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
         
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data);
-        } else {
-          throw new Error('Backend not returning data yet');
+        if (!response.ok) {
+          throw new Error('Failed to fetch live database transactions.');
         }
-      } catch (err) {
-        console.warn('Using mock data until backend endpoint is live:', err.message);
         
-        // Fallback mock data to visualize the reconciliation grid
-        setTransactions([
-          { id: 'TRX-9982', mpesaRef: 'QWE89ASDF', phone: '254705425117', amount: 5000, type: 'C2B Paybill', status: 'PAID', date: '2026-07-16 08:14' },
-          { id: 'TRX-9981', mpesaRef: 'QWE89ASDG', phone: '254722000000', amount: 1500, type: 'STK Push', status: 'PENDING', date: '2026-07-16 08:10' },
-          { id: 'TRX-9980', mpesaRef: 'QWE89ASDH', phone: '254711111111', amount: 250, type: 'B2C Salary', status: 'FAILED', date: '2026-07-16 07:45' },
-          { id: 'TRX-9979', mpesaRef: 'QWE89ASDJ', phone: '254733333333', amount: 10000, type: 'C2B Paybill', status: 'PAID', date: '2026-07-15 16:30' },
-        ]);
+        const data = await response.json();
+        
+        // Map backend Spring Boot entity fields to frontend table columns
+        const formattedData = data.map(tx => ({
+          id: tx.invoiceRef || tx.id || 'N/A',
+          mpesaRef: tx.receiptNumber || 'PENDING',
+          phone: tx.msisdn || 'N/A',
+          amount: tx.amount || 0,
+          type: tx.type || 'STK Push',
+          status: tx.status || 'PENDING',
+          // Ensure the date is formatted nicely
+          date: tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'Just now'
+        }));
+
+        // Sort by newest transactions first
+        formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        setTransactions(formattedData);
+      } catch (err) {
+        console.error('Database connection error:', err.message);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTransactions();
-  }, []); // The empty array ensures this only runs once when the tab is clicked
+    if (token) {
+      fetchTransactions();
+    }
+  }, [token]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -51,6 +68,13 @@ export default function FinanceDashboard() {
           Export CSV
         </button>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium">
+          Error: {error} - Please verify the backend endpoint is running.
+        </div>
+      )}
 
       {/* Data Grid Section */}
       <div className="overflow-x-auto">
@@ -70,18 +94,19 @@ export default function FinanceDashboard() {
             {loading ? (
               <tr>
                 <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
-                  Loading transactions...
+                  <svg className="animate-spin h-6 w-6 text-slate-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Syncing with database...
                 </td>
               </tr>
-            ) : transactions.length === 0 ? (
+            ) : transactions.length === 0 && !error ? (
               <tr>
                 <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
-                  No transactions found in the database.
+                  No live transactions found in the database.
                 </td>
               </tr>
             ) : (
-              transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+              transactions.map((tx, index) => (
+                <tr key={tx.id || index} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">{tx.date}</td>
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">{tx.id}</td>
                   <td className="px-6 py-4 font-mono font-medium text-slate-900">{tx.mpesaRef}</td>
@@ -90,7 +115,7 @@ export default function FinanceDashboard() {
                   <td className="px-6 py-4 font-semibold">KES {tx.amount.toLocaleString()}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold
-                      ${tx.status === 'PAID' ? 'bg-green-100 text-green-800' : ''}
+                      ${tx.status === 'PAID' || tx.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : ''}
                       ${tx.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : ''}
                       ${tx.status === 'FAILED' ? 'bg-red-100 text-red-800' : ''}
                     `}>
