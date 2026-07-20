@@ -36,15 +36,13 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**").permitAll()
-                // Fixed: Added the 's' to perfectly match your CallbackController
+                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/invoices/**").permitAll()
                 .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
-                // Allow the default error route so missing endpoints return 404 instead of a masked 403
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
             )
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider())
+            .authenticationProvider(authenticationProvider()) 
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
