@@ -74,6 +74,12 @@
             <scope>test</scope>
         </dependency>
 
+<!-- AMQP Dependency for RabbitMQ Message Queue -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        
         <!-- JSON Web Token (JWT) Libraries -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

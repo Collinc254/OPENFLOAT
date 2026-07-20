@@ -1,10 +1,6 @@
 package com.openfloat.middleware.config;
 
-import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -25,31 +21,46 @@ public class RabbitMQConfig {
     @Value("${openfloat.rabbitmq.routing-key}")
     private String routingKey;
 
-    // 1. Create the Queue
+    // 1. Upgraded Main Queue: Configured with Dead-Letter Exchange rules
     @Bean
     public Queue queue() {
-        return new Queue(queueName, true);
+        return QueueBuilder.durable(queueName)
+                .withArgument("x-dead-letter-exchange", exchangeName)
+                .withArgument("x-dead-letter-routing-key", routingKey + ".dlq")
+                .build();
     }
 
-    // 2. Create the Exchange
+    // 2. Dead-Letter Queue (DLQ): Where failed payloads are parked for monitoring
+    @Bean
+    public Queue deadLetterQueue() {
+        return QueueBuilder.durable(queueName + ".dlq").build();
+    }
+
+    // 3. Primary Direct Exchange
     @Bean
     public DirectExchange exchange() {
         return new DirectExchange(exchangeName);
     }
 
-    // 3. Bind the Queue to the Exchange using your Routing Key
+    // 4. Bind the Main Queue to the Exchange using your primary Routing Key
     @Bean
     public Binding binding(Queue queue, DirectExchange exchange) {
         return BindingBuilder.bind(queue).to(exchange).with(routingKey);
     }
 
-    // 4. Configure Jackson 3 to convert Java objects to JSON messages automatically
+    // 5. Bind the DLQ to the Exchange using the DLQ Routing Key
     @Bean
-    public MessageConverter jsonMessageConverter() {
-   return new Jackson2JsonMessageConverter();
+    public Binding dlqBinding(Queue deadLetterQueue, DirectExchange exchange) {
+        return BindingBuilder.bind(deadLetterQueue).to(exchange).with(routingKey + ".dlq");
     }
 
-    // 5. Apply the JSON converter to the standard RabbitTemplate
+    // 6. Configure Jackson to convert Java objects to JSON strings automatically
+    @Bean
+    public MessageConverter jsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
+    }
+
+    // 7. Configure RabbitTemplate with explicit type safety to clear IDE warnings
     @Bean
     public AmqpTemplate amqpTemplate(ConnectionFactory connectionFactory) {
         final RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
