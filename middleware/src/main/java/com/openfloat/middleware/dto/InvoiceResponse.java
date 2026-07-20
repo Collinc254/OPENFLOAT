@@ -1,10 +1,15 @@
 package com.openfloat.middleware.dto;
 
+import lombok.Builder;
+import lombok.Data;
 import java.math.BigDecimal;
 
-public record InvoiceResponse(
-    String invoiceNo,
-    String paybill,
-    BigDecimal amount,
-    String status
-) {}
+@Data
+@Builder
+public class InvoiceResponse {
+    private String invoiceNumber;
+    private BigDecimal amount;
+    private String customerMsisdn;
+    private String serviceRef;
+    private String status;
+}

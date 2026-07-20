@@ -1,28 +1,32 @@
 package com.openfloat.middleware.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
 
+@Data
 @Entity
-@Table(name = "tenants")
-@Getter
-@Setter
+@Table(name = "registered_tenants")
 public class Tenant {
 
     @Id
-    @Column(name = "tenant_id", nullable = false, updatable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name; // <--- This resolves the setName() error in MiddlewareApplication
+
+    @Column(nullable = false, unique = true)
     private String tenantId;
 
-    @Column(name = "name", nullable = false)
-    private String name;
+    @Column(nullable = false, unique = true)
+    private String apiKey;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive;
-
-    @Column(name = "callback_url", nullable = false)
+    @Column(nullable = false)
     private String callbackUrl;
+
+    private boolean isActive = true;
+
+    @Column(updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

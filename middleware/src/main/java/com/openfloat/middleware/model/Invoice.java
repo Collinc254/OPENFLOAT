@@ -1,45 +1,41 @@
 package com.openfloat.middleware.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Data
 @Entity
 @Table(name = "invoices")
-@Getter
-@Setter
 public class Invoice {
 
     @Id
-    @Column(name = "invoice_no", nullable = false, updatable = false)
-    private String invoiceNo;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String invoiceNumber;
+
+    @Column(nullable = false)
+    private BigDecimal amount;
+
+    private String serviceRef;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    @Column(name = "msisdn", nullable = false)
-    private String msisdn;
+    @Column(nullable = false)
+    private String customerMsisdn;
 
-    @Column(name = "amount", nullable = false)
-    private BigDecimal amount;
+    @Column(nullable = false)
+    private String status = "PENDING"; // PENDING, PAID, FAILED
 
-    @Column(name = "service_ref", nullable = false)
-    private String serviceRef;
+    private LocalDateTime issuedAt = LocalDateTime.now();
 
-    @Column(name = "status", nullable = false)
-    private String status;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = "PENDING";
-        }
+    // Explicit alias getters to satisfy CallbackService references
+    public String getInvoiceNo() {
+        return this.invoiceNumber;
     }
 }

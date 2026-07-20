@@ -20,15 +20,14 @@ import java.time.LocalDateTime;
 public class CallbackService {
 
     private final InvoiceRepository invoiceRepository;
-    
-    // 1. Inject the Event Publisher
     private final EventPublisherService eventPublisherService;
 
     @Transactional(readOnly = true)
     public MpesaCallbackResponse validatePayment(MpesaCallbackRequest request) {
         String invoiceNo = request.billRefNumber();
 
-        Invoice invoice = invoiceRepository.findById(invoiceNo)
+        // 1. Fetch and assign the invoice variable
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
                 .orElseThrow(() -> new ValidationRejectedException("Invalid account reference. Invoice not found."));
 
         if (!invoice.getTenant().isActive()) {
@@ -46,7 +45,8 @@ public class CallbackService {
     public String confirmPayment(MpesaConfirmationRequest request) {
         String invoiceNo = request.billRefNumber();
 
-        Invoice invoice = invoiceRepository.findById(invoiceNo)
+        // 2. Fetch and assign the invoice variable
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
                 .orElseThrow(() -> new IllegalArgumentException("Received confirmation for unknown invoice: " + invoiceNo));
 
         if ("PAID".equals(invoice.getStatus())) {
@@ -59,17 +59,17 @@ public class CallbackService {
 
         log.info("Successfully confirmed payment for Invoice: {} Amount: {}", invoiceNo, request.transAmount());
 
-        // 2. Build the payload for the ERP system
+        // 3. Build the payload for the ERP system
         PaymentEvent paymentEvent = new PaymentEvent(
             request.transId(), // Using M-Pesa Receipt Number as the reconciliation ID
-            invoice.getInvoiceNo(),
+            invoice.getInvoiceNumber(),
             request.msisdn(),
             request.transAmount(),
             invoice.getServiceRef(),
             LocalDateTime.now()
         );
 
-        // 3. Publish the event to RabbitMQ
+        // 4. Publish the event to RabbitMQ
         eventPublisherService.publishPaymentConfirmed(paymentEvent);
 
         return "Acknowledged";
