@@ -31,7 +31,7 @@ public class CallbackController {
         int resultCode = callbackData.getResultCode();
 
         // 1. Find the pending transaction in the database
-        Optional<MpesaTransaction> transactionOptional = transactionRepository.findById(checkoutRequestId);
+        Optional<MpesaTransaction> transactionOptional = transactionRepository.findByCheckoutRequestId(checkoutRequestId);
 
         if (transactionOptional.isPresent()) {
             MpesaTransaction transaction = transactionOptional.get();
