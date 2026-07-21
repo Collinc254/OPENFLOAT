@@ -58,12 +58,7 @@ public class StkPushController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/callback")
-    public ResponseEntity<String> handleDarajaCallback(@RequestBody String callbackPayload) {
-        log.info("DARAJA CALLBACK RECEIVED: {}", callbackPayload);
-        stkPushService.processCallback(callbackPayload);
-        return ResponseEntity.ok("Callback received successfully");
-    }
+    // THE DUPLICATE /callback ENDPOINT HAS BEEN DELETED FROM HERE
 
     @GetMapping("/status/{checkoutRequestId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String checkoutRequestId) {
