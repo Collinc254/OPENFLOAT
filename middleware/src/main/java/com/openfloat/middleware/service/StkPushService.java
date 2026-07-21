@@ -121,11 +121,17 @@ public class StkPushService {
         }
     }
 
-    // Safaricom Callback Parser and Database Updater
     public void processCallback(String rawJson) {
-        try {
-            JsonNode rootNode = objectMapper.readTree(rawJson);
-            JsonNode stkCallback = rootNode.path("Body").path("stkCallback");
+    try {
+        // 1. ADD THIS LOGGING LINE RIGHT HERE
+        log.info("RAW DARAJA CALLBACK: {}", rawJson);
+
+        JsonNode rootNode = objectMapper.readTree(rawJson);
+
+        // 2. REPLACE THE OLD Body SEARCH WITH THIS BULLETPROOF VERSION
+        JsonNode bodyNode = rootNode.has("Body") ? rootNode.path("Body") : rootNode.path("body");
+        JsonNode stkCallback = bodyNode.path("stkCallback");
+       
 
             String checkoutRequestID = stkCallback.path("CheckoutRequestID").asText();
             int resultCode = stkCallback.path("ResultCode").asInt();
