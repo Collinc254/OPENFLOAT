@@ -9,6 +9,7 @@ import com.openfloat.middleware.model.MpesaTransaction;
 import com.openfloat.middleware.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -52,8 +53,11 @@ public class StkPushService {
     // Jackson ObjectMapper to parse Safaricom's nested JSON
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // NEW: Inject the database repository
+    // Inject the database repository
     private final TransactionRepository transactionRepository;
+
+    // NEW: Inject RabbitTemplate to talk to CloudAMQP
+    private final RabbitTemplate rabbitTemplate;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         // 1. Get the temporary security token
@@ -94,7 +98,7 @@ public class StkPushService {
             
             DarajaStkPushResponse pushResponse = response.getBody();
 
-            // NEW: Save the initial PENDING transaction to the database
+            // Save the initial PENDING transaction to the database
             if (pushResponse != null) {
                 MpesaTransaction pendingTrx = new MpesaTransaction();
                 pendingTrx.setId(request.invoiceRef()); // e.g., INV-123456789
@@ -127,7 +131,7 @@ public class StkPushService {
             int resultCode = stkCallback.path("ResultCode").asInt();
             String resultDesc = stkCallback.path("ResultDesc").asText();
 
-            // NEW: Look up the transaction in the database using the Checkout Request ID
+            // Look up the transaction in the database using the Checkout Request ID
             Optional<MpesaTransaction> optionalTrx = transactionRepository.findByCheckoutRequestId(checkoutRequestID);
 
             if (optionalTrx.isPresent()) {
@@ -150,6 +154,10 @@ public class StkPushService {
                     // Update database entity to PAID
                     trx.setStatus("PAID");
                     trx.setMpesaRef(mpesaReceiptNumber);
+                    
+                    // NEW: Push the successful transaction to your RabbitMQ queue
+                    rabbitTemplate.convertAndSend("openfloat.erp.queue", trx);
+                    log.info("Message successfully published to CloudAMQP queue!");
                     
                 } else {
                     // Payment failed
