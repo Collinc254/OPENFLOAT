@@ -19,4 +19,10 @@ public class PaymentController {
         DarajaStkPushResponse response = stkPushService.sendPush(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/callback")
+    public ResponseEntity<String> handleSafaricomCallback(@RequestBody String payload) {
+        stkPushService.processCallback(payload);
+        return ResponseEntity.ok("Success");
+    }
 }
