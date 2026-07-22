@@ -14,26 +14,22 @@ import java.util.List;
 @RequestMapping("/api/v1/transactions") 
 public class TransactionController {
 
-    // 1. Mark the field as final
     private final TransactionRepository transactionRepository;
 
-    // 2. Create a constructor for injection (Spring automatically wires this up)
     public TransactionController(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
     }
 
-    // Endpoint to get all transactions for the Finance Dashboard
     @GetMapping
     public ResponseEntity<List<MpesaTransaction>> getAllTransactions() {
         List<MpesaTransaction> transactions = transactionRepository.findAllByOrderByDateDesc();
         return ResponseEntity.ok(transactions);
     }
 
-    // Endpoint to get a single transaction by ID for the Operator Dashboard polling
     @GetMapping("/{id}")
     public ResponseEntity<MpesaTransaction> getTransactionById(@PathVariable String id) {
         return transactionRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
     }
 }
