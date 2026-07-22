@@ -28,16 +28,16 @@ export default function FinanceDashboard({ token }) {
         
         // Map backend Spring Boot entity fields to frontend table columns
         const formattedData = data.map(tx => ({
-          id: tx.invoiceRef || tx.id || 'N/A',
-          mpesaRef: tx.receiptNumber || 'PENDING',
-          phone: tx.msisdn || 'N/A',
+          id: tx.id || 'N/A',
+          mpesaRef: tx.mpesaRef || 'PENDING',
+          phone: tx.phone || 'N/A',
           amount: tx.amount || 0,
           type: tx.type || 'STK Push',
           status: tx.status || 'PENDING',
-          // Ensure the date is formatted nicely
-          date: tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'Just now'
+          // Java already formats this nicely via @JsonFormat
+          date: tx.date || 'Just now' 
         }));
-
+        
         // Sort by newest transactions first
         formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
         
