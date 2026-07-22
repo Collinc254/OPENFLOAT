@@ -129,7 +129,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
-      }, 30000);
+      }, 90000);
     }
 
     return () => {
