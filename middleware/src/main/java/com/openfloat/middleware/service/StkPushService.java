@@ -47,33 +47,22 @@ public class StkPushService {
     @Value("${safaricom.daraja.callback-url}")
     private String callbackUrl;
 
-    // RestTemplate is Spring's default HTTP client for making external API calls
     private final RestTemplate restTemplate = new RestTemplate();
-    
-    // Jackson ObjectMapper to parse Safaricom's nested JSON
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Inject the database repository
     private final TransactionRepository transactionRepository;
-
-    // NEW: Inject RabbitTemplate to talk to CloudAMQP
     private final RabbitTemplate rabbitTemplate;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
-        // 1. Get the temporary security token
         String token = getAccessToken();
-        
-        // 2. Generate the timestamp and encrypted password
         String timestamp = generateTimestamp();
         String password = generatePassword(timestamp);
 
-        // 3. Build the exact payload Safaricom expects
         DarajaStkPushPayload payload = new DarajaStkPushPayload(
                 shortcode,
                 password,
                 timestamp,
                 "CustomerPayBillOnline",
-                String.valueOf(request.amount().intValue()), // Safaricom expects whole numbers as strings
+                String.valueOf(request.amount().intValue()),
                 request.msisdn(),
                 shortcode,
                 request.msisdn(),
@@ -82,7 +71,6 @@ public class StkPushService {
                 "Payment for Invoice " + request.invoiceRef()
         );
 
-        // 4. Attach the headers and Bearer token
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
@@ -91,24 +79,21 @@ public class StkPushService {
 
         log.info("Initiating STK Push to MSISDN: {} for Amount: {}", request.msisdn(), request.amount());
 
-        // 5. Fire the POST request to Daraja
         try {
             ResponseEntity<DarajaStkPushResponse> response = restTemplate.postForEntity(
                     stkPushUrl, entity, DarajaStkPushResponse.class);
             
             DarajaStkPushResponse pushResponse = response.getBody();
 
-            // Save the initial PENDING transaction to the database
             if (pushResponse != null) {
                 MpesaTransaction pendingTrx = new MpesaTransaction();
-                pendingTrx.setId(request.invoiceRef()); // e.g., INV-123456789
+                pendingTrx.setId(request.invoiceRef());
                 pendingTrx.setPhone(request.msisdn());
                 pendingTrx.setAmount(request.amount());
                 pendingTrx.setType("STK Push");
                 pendingTrx.setStatus("PENDING");
+                pendingTrx.setMpesaRef("PENDING");
                 pendingTrx.setDate(LocalDateTime.now());
-                
-                // IMPORTANT: If your DarajaStkPushResponse uses a different getter name (like getCheckoutRequestID()), update it here.
                 pendingTrx.setCheckoutRequestId(pushResponse.checkoutRequestId()); 
                 
                 transactionRepository.save(pendingTrx);
@@ -122,58 +107,68 @@ public class StkPushService {
     }
 
     public void processCallback(String rawJson) {
-    try {
-        // 1. ADD THIS LOGGING LINE RIGHT HERE
-        log.info("RAW DARAJA CALLBACK: {}", rawJson);
+        try {
+            log.info("RAW DARAJA CALLBACK: {}", rawJson);
 
-        JsonNode rootNode = objectMapper.readTree(rawJson);
-
-        // 2. REPLACE THE OLD Body SEARCH WITH THIS BULLETPROOF VERSION
-        JsonNode bodyNode = rootNode.has("Body") ? rootNode.path("Body") : rootNode.path("body");
-        JsonNode stkCallback = bodyNode.path("stkCallback");
-       
+            JsonNode rootNode = objectMapper.readTree(rawJson);
+            JsonNode bodyNode = rootNode.has("Body") ? rootNode.path("Body") : rootNode.path("body");
+            JsonNode stkCallback = bodyNode.path("stkCallback");
 
             String checkoutRequestID = stkCallback.path("CheckoutRequestID").asText();
             int resultCode = stkCallback.path("ResultCode").asInt();
             String resultDesc = stkCallback.path("ResultDesc").asText();
 
-            // Look up the transaction in the database using the Checkout Request ID
             Optional<MpesaTransaction> optionalTrx = transactionRepository.findByCheckoutRequestId(checkoutRequestID);
 
             if (optionalTrx.isPresent()) {
                 MpesaTransaction trx = optionalTrx.get();
 
                 if (resultCode == 0) {
-                    // Payment was successful! Extract the receipt number.
                     JsonNode items = stkCallback.path("CallbackMetadata").path("Item");
                     String mpesaReceiptNumber = "";
+                    String transactionDateStr = "";
+                    String phoneNumber = "";
                     
-                    for (JsonNode item : items) {
-                        if ("MpesaReceiptNumber".equals(item.path("Name").asText())) {
-                            mpesaReceiptNumber = item.path("Value").asText();
-                            break;
+                    if (items.isArray()) {
+                        for (JsonNode item : items) {
+                            String name = item.path("Name").asText();
+                            if ("MpesaReceiptNumber".equals(name)) {
+                                mpesaReceiptNumber = item.path("Value").asText();
+                            } else if ("TransactionDate".equals(name)) {
+                                transactionDateStr = item.path("Value").asText();
+                            } else if ("PhoneNumber".equals(name)) {
+                                phoneNumber = item.path("Value").asText();
+                            }
                         }
                     }
                     
                     log.info("PAYMENT SUCCESS! Database updated. Receipt: {}, Checkout ID: {}", mpesaReceiptNumber, checkoutRequestID);
                     
-                    // Update database entity to PAID
                     trx.setStatus("PAID");
                     trx.setMpesaRef(mpesaReceiptNumber);
+
+                    if (!phoneNumber.isEmpty()) {
+                        trx.setPhone(phoneNumber);
+                    }
+
+                    if (!transactionDateStr.isEmpty()) {
+                        try {
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+                            LocalDateTime parsedDate = LocalDateTime.parse(transactionDateStr, formatter);
+                            trx.setDate(parsedDate);
+                        } catch (Exception e) {
+                            log.warn("Could not parse transaction date '{}': {}", transactionDateStr, e.getMessage());
+                        }
+                    }
                     
-                    // NEW: Push the successful transaction to your RabbitMQ queue
                     rabbitTemplate.convertAndSend("openfloat.erp.queue", trx);
                     log.info("Message successfully published to CloudAMQP queue!");
                     
                 } else {
-                    // Payment failed
                     log.warn("PAYMENT FAILED! Database updated. Reason: {}, Checkout ID: {}", resultDesc, checkoutRequestID);
-                    
-                    // Update database entity to FAILED
                     trx.setStatus("FAILED");
                 }
 
-                // Commit the status change to the database
                 transactionRepository.save(trx);
 
             } else {
@@ -185,20 +180,15 @@ public class StkPushService {
         }
     }
 
-    // --- Helper Methods for Cryptography and Auth ---
-
-    // A strictly-typed record to handle the Safaricom authentication response cleanly
     private record DarajaAuthResponse(String access_token) {}
 
     private String getAccessToken() {
         HttpHeaders headers = new HttpHeaders();
-        // Spring handles encoding the basic auth credentials for us
         headers.setBasicAuth(consumerKey, consumerSecret); 
         
         HttpEntity<String> request = new HttpEntity<>(headers);
 
         try {
-            // Using our clean record instead of a generic Map
             ResponseEntity<DarajaAuthResponse> response = restTemplate.exchange(
                     authUrl, HttpMethod.GET, request, DarajaAuthResponse.class);
             
