@@ -18,7 +18,7 @@ import java.io.InputStream;
 public class B2CService {
 
     private final B2CSecurityUtility securityUtility;
-    private final DarajaAuthService authService; // <-- This is the newly injected Auth Service
+    private final DarajaAuthService authService; 
 
     @Value("${safaricom.b2c.initiator-name}")
     private String initiatorName;
@@ -42,6 +42,9 @@ public class B2CService {
             String encryptedCredential = securityUtility.encryptInitiatorPassword(initiatorPassword, certStream);
 
             // 2. Build Payload
+            log.info("EXACT RESULT URL: [{}]", resultUrl);
+            log.info("EXACT TIMEOUT URL: [{}]", timeoutUrl);
+            
             B2CRequest requestPayload = B2CRequest.builder()
                     .InitiatorName(initiatorName)
                     .SecurityCredential(encryptedCredential)
