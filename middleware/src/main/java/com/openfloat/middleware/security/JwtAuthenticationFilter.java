@@ -20,9 +20,21 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-   private final org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
+    private final org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
+    // --- NEW BYPASS RULE ---
    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        // Tells the JWT filter to completely ignore these public endpoints
+        return path.startsWith("/api/v1/c2b/") 
+            || path.startsWith("/api/v1/auth/")
+            || path.startsWith("/api/v1/callbacks/")
+            || path.startsWith("/api/v1/b2c/"); 
+    }
+    // -----------------------
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,

@@ -29,7 +29,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
-    @Bean
+   @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
@@ -38,6 +38,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/invoices/**").permitAll()
                 .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
+                .requestMatchers("/api/v1/c2b/**").permitAll() // <-- UPDATED TO 
+                .requestMatchers("/api/v1/b2c/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
             )
@@ -48,12 +50,21 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
+   @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "https://openfloat.vercel.app"));
+        
+        // Added https://hoppscotch.io to the allowed origins
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000", 
+            "https://openfloat.vercel.app",
+            "https://hoppscotch.io" 
+        ));
+        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        
+        // Changed to allow all headers so Hoppscotch doesn't trigger a strict header rejection
+        configuration.setAllowedHeaders(Arrays.asList("*")); 
         configuration.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
