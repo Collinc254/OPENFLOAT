@@ -1,6 +1,10 @@
 package com.openfloat.middleware.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openfloat.middleware.dto.B2CRequest;
+import com.openfloat.middleware.entity.B2CTransaction; 
+import com.openfloat.middleware.repository.B2CTransactionRepository;
 import com.openfloat.middleware.utils.B2CSecurityUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +22,9 @@ import java.io.InputStream;
 public class B2CService {
 
     private final B2CSecurityUtility securityUtility;
-    private final DarajaAuthService authService; 
+    private final DarajaAuthService authService;
+    private final B2CTransactionRepository transactionRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${safaricom.b2c.initiator-name}")
     private String initiatorName;
@@ -73,9 +79,32 @@ public class B2CService {
             // 5. Send to Safaricom
             log.info("Sending B2C Request for amount {} to {}", amount, phoneNumber);
             ResponseEntity<String> response = restTemplate.postForEntity(b2cEndpoint, requestEntity, String.class);
+            String responseBody = response.getBody();
             
-            log.info("Safaricom B2C Acknowledgment: {}", response.getBody());
-            return response.getBody();
+            log.info("Safaricom B2C Acknowledgment: {}", responseBody);
+
+            // 6. Parse JSON and Save to Database
+            if (responseBody != null) {
+                JsonNode jsonNode = objectMapper.readTree(responseBody);
+                String responseCode = jsonNode.path("ResponseCode").asText();
+
+                if ("0".equals(responseCode)) {
+                    B2CTransaction transaction = B2CTransaction.builder()
+                            .originatorConversationId(jsonNode.path("OriginatorConversationID").asText())
+                            .conversationId(jsonNode.path("ConversationID").asText())
+                            .phoneNumber(phoneNumber)
+                            .amount(amount)
+                            .status("PENDING")
+                            .build();
+                    
+                    transactionRepository.save(transaction);
+                    log.info("Successfully saved PENDING transaction to database.");
+                } else {
+                    log.error("Safaricom rejected the B2C request. Response: {}", responseBody);
+                }
+            }
+
+            return responseBody;
 
         } catch (Exception e) {
             log.error("Failed to execute B2C payment: {}", e.getMessage());
