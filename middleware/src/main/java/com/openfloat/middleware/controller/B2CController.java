@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*") 
 @RequestMapping("/api/v1/b2c")
 @RequiredArgsConstructor
 public class B2CController {
+   
+
 
     private final B2CService b2cService;
     private final B2CTransactionRepository transactionRepository;
