@@ -4,12 +4,13 @@ import OperatorDashboard from './components/OperatorDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
+// 1. IMPORT THE NEW PAYMENT FORM HERE
+import B2CPaymentForm from './components/B2CPaymentForm'; 
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('operator'); 
   
-  // State variable to control the sidebar collapse/expand behavior
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const handleLoginSuccess = (userData) => {
@@ -23,7 +24,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       
-      {/* 1. Left Sidebar Navigation (Dynamic Width & Transitions) */}
+      {/* Left Sidebar Navigation */}
       <aside className={`bg-slate-900 text-white flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
         
         {/* Portal Branding */}
@@ -53,13 +54,29 @@ export default function App() {
                 </span>
               </button>
             </li>
+
+            {/* 2. ADD THE B2C PAYOUTS BUTTON HERE */}
+            <li>
+              <button 
+                onClick={() => setActiveTab('payouts')}
+                title="B2C Payouts"
+                className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+              >
+                {/* Money SVG Icon */}
+                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                  B2C Payouts
+                </span>
+              </button>
+            </li>
+
             <li>
               <button 
                 onClick={() => setActiveTab('finance')}
                 title="Finance & Recon"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
-                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
                   Finance & Recon
                 </span>
@@ -119,7 +136,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* 2. Right Main Content Area */}
+      {/* Right Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         
         {/* Dynamic Header */}
@@ -136,19 +153,22 @@ export default function App() {
           </button>
 
           <h2 className="text-2xl font-bold text-slate-800 capitalize">
-            {activeTab === 'finance' ? 'Finance & Reconciliation' : `${activeTab} Dashboard`}
+            {activeTab === 'finance' ? 'Finance & Reconciliation' : 
+             activeTab === 'payouts' ? 'B2C Payouts' : 
+             `${activeTab} Dashboard`}
           </h2>
         </header>
         
         {/* Scrollable Workspace */}
         <div className="flex-1 p-8 overflow-y-auto bg-slate-50 relative">
-          <div className="max-w-6xl mx-auto">
+          <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             
-        {/* The Switchboard: Render component based on state */}
-{activeTab === 'operator' && <OperatorDashboard />}
-{activeTab === 'finance' && <FinanceDashboard token={user.token} />}
-{activeTab === 'admin' && <AdminConsole />}
-{activeTab === 'viewer' && <AuditViewer token={user.token} />}
+            {/* 3. ADD THE COMPONENT TO YOUR SWITCHBOARD HERE */}
+            {activeTab === 'operator' && <OperatorDashboard />}
+            {activeTab === 'payouts' && <B2CPaymentForm />}
+            {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
+            {activeTab === 'admin' && <AdminConsole />}
+            {activeTab === 'viewer' && <AuditViewer token={user.token} />}
 
           </div>
         </div>
