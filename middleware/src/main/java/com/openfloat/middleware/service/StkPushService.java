@@ -13,7 +13,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -100,9 +102,15 @@ public class StkPushService {
             }
 
             return pushResponse;
+            
+        } catch (ResourceAccessException e) {
+            // Catches the 8-second timeout when Daraja Sandbox is down
+            log.error("Safaricom Daraja API timed out: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Safaricom API is currently unresponsive. Please try again later.");
         } catch (Exception e) {
+            // Fallback for bad payloads or other generic errors
             log.error("Daraja STK Push Failed: {}", e.getMessage());
-            throw new RuntimeException("Failed to initiate STK Push with Safaricom.");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to initiate STK Push with Safaricom.");
         }
     }
 
@@ -195,11 +203,14 @@ public class StkPushService {
             if (response.getBody() != null && response.getBody().access_token() != null) {
                 return response.getBody().access_token();
             } else {
-                throw new RuntimeException("Access token missing in Daraja response");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Access token missing in Daraja response");
             }
+        } catch (ResourceAccessException e) {
+            log.error("Daraja Auth API timed out: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Safaricom Authentication API is unresponsive.");
         } catch (Exception e) {
             log.error("Failed to authenticate with Daraja: {}", e.getMessage());
-            throw new RuntimeException("Daraja Authentication Failed");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Daraja Authentication Failed");
         }
     }
 
