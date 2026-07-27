@@ -17,6 +17,7 @@ import java.util.Map;
 
 @Slf4j
 @RestController
+@CrossOrigin(originPatterns = "*") // Added to bypass the Spring Security 500 error
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 public class StkPushController {
