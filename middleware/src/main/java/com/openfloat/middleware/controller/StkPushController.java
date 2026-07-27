@@ -17,7 +17,6 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@CrossOrigin(originPatterns = "*") // Added to bypass the Spring Security 500 error
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 public class StkPushController {
@@ -58,8 +57,6 @@ public class StkPushController {
 
         return ResponseEntity.ok(response);
     }
-
-    // THE DUPLICATE /callback ENDPOINT HAS BEEN DELETED FROM HERE
 
     @GetMapping("/status/{checkoutRequestId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String checkoutRequestId) {
