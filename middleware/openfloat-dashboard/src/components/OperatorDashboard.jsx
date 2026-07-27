@@ -6,9 +6,9 @@ export default function OperatorDashboard() {
   const [transactionType, setTransactionType] = useState('STK Push');
   
   // Single transaction state
-  const [phone, setPhone] = useState('254 705 425 117');
+  const [phone, setPhone] = useState('254 708 374 149'); // Defaulted to Safaricom's universal test number
   const [phoneError, setPhoneError] = useState('');
-  const [amount, setAmount] = useState('1');
+  const [amount, setAmount] = useState('10');
   
   // Batch transaction state
   const [batchFile, setBatchFile] = useState(null);
@@ -98,19 +98,16 @@ export default function OperatorDashboard() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       pollInterval = setInterval(() => {
-        // UPDATED: Now hitting your new status endpoint with the CheckoutRequestID
         fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`)
           .then((res) => {
             if (!res.ok) throw new Error('Transaction not found yet');
             return res.json();
           })
           .then((data) => {
-            // UPDATED: Checking for the specific SUCCESS status and receipt variable from Spring Boot
             if (data.status === 'SUCCESS') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('success');
-              // Outputting the exact string requested
               setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
             } else if (data.status === 'FAILED') {
@@ -122,7 +119,7 @@ export default function OperatorDashboard() {
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
-      }, 3000); // Poll every 3 seconds
+      }, 3000);
 
       timeout = setTimeout(() => {
         clearInterval(pollInterval);
@@ -138,7 +135,7 @@ export default function OperatorDashboard() {
     };
   }, [status, activeTxRef]);
 
-  // --- SUBMISSION LOGIC ---
+  // --- 3. SMART ROUTING SUBMISSION LOGIC ---
   const handleExecute = async (e) => {
     e.preventDefault();
     if (phoneError) return; 
@@ -148,36 +145,54 @@ export default function OperatorDashboard() {
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
-      
       const cleanPhone = phone.replace(/\s/g, '');
       const txRef = `INV-${Date.now()}`;
       
-      const payload = processingMode === 'single' 
-        ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef, tenantId: "ORG-001" }
-        : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
-
       if (processingMode === 'single') {
-        const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+        
+        // ROUTE A: B2C DISBURSEMENT FLOW
+        if (transactionType.startsWith('B2C')) {
+            const url = `${API_BASE_URL}/api/v1/b2c/simulate?phoneNumber=${cleanPhone}&amount=${amount}`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
 
-        if (!response.ok) {
-          throw new Error('Server rejected the STK push request');
+            if (!response.ok) throw new Error('Server rejected the B2C request');
+            
+            const data = await response.json();
+
+            if (data.ResponseCode === "0" || data.responseCode === "0") {
+                setStatus('success');
+                setMessage(`Success! Payment queued. Tracking ID: ${data.ConversationID || data.conversationId}`);
+            } else {
+                setStatus('error');
+                setMessage(`Failed: Safaricom rejected the request. Check Render logs.`);
+            }
+        } 
+        // ROUTE B: STK PUSH COLLECTION FLOW
+        else {
+            const payload = { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef, tenantId: "ORG-001" };
+
+            const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) throw new Error('Server rejected the STK push request');
+
+            const responseData = await response.json();
+            const checkoutId = responseData.CheckoutRequestID || responseData.checkoutRequestID || responseData.checkoutRequestId;
+
+            setStatus('polling');
+            setActiveTxRef(checkoutId); 
+            setMessage('Awaiting customer PIN entry...'); 
         }
 
-        // UPDATED: Extract Safaricom's tracking ID to use for polling
-        const responseData = await response.json();
-        const checkoutId = responseData.CheckoutRequestID || responseData.checkoutRequestID || responseData.checkoutRequestId;
-
-        setStatus('polling');
-        // Set the active reference to Safaricom's tracking ID, not the local invoice ID
-        setActiveTxRef(checkoutId); 
-        setMessage('Awaiting customer PIN entry...'); 
       } else {
+        // BATCH PROCESSING MOCK
         await new Promise(resolve => setTimeout(resolve, 1000));
         setStatus('success');
         setMessage(`Batch ${transactionType} queued successfully. Processing ${batchData.length} records.`);
