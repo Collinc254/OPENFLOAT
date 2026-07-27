@@ -192,13 +192,21 @@ public class StkPushService {
 
     private String getAccessToken() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBasicAuth(consumerKey, consumerSecret); 
+        
+        // Fix 1 & 2: Trim invisible spaces from keys and add cache control
+        headers.setBasicAuth(consumerKey.trim(), consumerSecret.trim()); 
+        headers.add("Cache-Control", "no-cache");
         
         HttpEntity<String> request = new HttpEntity<>(headers);
 
+        // Fix 3: Guarantee the grant_type parameter exists
+        String finalAuthUrl = authUrl.contains("grant_type") 
+            ? authUrl 
+            : authUrl + "?grant_type=client_credentials";
+
         try {
             ResponseEntity<DarajaAuthResponse> response = restTemplate.exchange(
-                    authUrl, HttpMethod.GET, request, DarajaAuthResponse.class);
+                    finalAuthUrl, HttpMethod.GET, request, DarajaAuthResponse.class);
             
             if (response.getBody() != null && response.getBody().access_token() != null) {
                 return response.getBody().access_token();
