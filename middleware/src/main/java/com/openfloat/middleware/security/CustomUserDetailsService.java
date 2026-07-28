@@ -3,11 +3,14 @@ package com.openfloat.middleware.security;
 import com.openfloat.middleware.model.SystemUser;
 import com.openfloat.middleware.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
@@ -22,17 +25,17 @@ public class CustomUserDetailsService implements UserDetailsService {
         SystemUser systemUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // --- STRICT SECURITY LOCKDOWN ---
-        // Instantly block anyone who is not an ADMIN, even if their password is correct!
-        if (!"ADMIN".equalsIgnoreCase(systemUser.getRole())) {
-            throw new UsernameNotFoundException("Access Denied: You are not an Administrator.");
+        // SECURE FIX: Format the database string strictly to Spring Security standards
+        String roleName = systemUser.getRole();
+        if (roleName != null && !roleName.startsWith("ROLE_")) {
+            roleName = "ROLE_" + roleName.toUpperCase();
         }
 
-        // Convert our SystemUser into Spring Security's built-in User object
-        return User.builder()
-                .username(systemUser.getUsername())
-                .password(systemUser.getPassword())
-                .roles(systemUser.getRole()) 
-                .build();
+        // Convert our SystemUser into Spring Security's built-in User object with explicit Authority
+        return new User(
+                systemUser.getUsername(),
+                systemUser.getPassword(),
+                Collections.singletonList(new SimpleGrantedAuthority(roleName))
+        );
     }
 }

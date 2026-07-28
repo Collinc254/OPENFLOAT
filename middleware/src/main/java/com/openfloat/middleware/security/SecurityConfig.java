@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -31,38 +32,46 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
 
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .authorizeHttpRequests(auth -> auth
-            // 1. PUBLIC: Authentication endpoints & Spring Error page
-            .requestMatchers("/api/v1/auth/**", "/error").permitAll()
-            
-            // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
-            .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
-            
-            // 3. ADMIN CONSOLE: Restricted to Admin users
-            .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
-            
-            // 4. PAYMENTS & TRANSACTIONS: Any valid logged-in user with a JWT token can execute
-            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**", "/api/v1/invoices/**")
-                .authenticated()
-            
-            // Everything else requires authentication
-            .anyRequest().authenticated()
-        )
-        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authenticationProvider(authenticationProvider()) 
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                
+                // 0. EXPLICITLY ALLOW CORS PREFLIGHT: Prevents Vercel/Browser 403 blocks
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                
+                // 1. PUBLIC: Authentication endpoints & Spring Error page
+                .requestMatchers("/api/v1/auth/**", "/error").permitAll()
+                
+                // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
+                .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
+                
+                // 3. ADMIN CONSOLE: Strict Admin lock
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                
+                // 4. PAYMENTS & TRANSACTIONS: Strict Operator and Admin lock
+                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
+                    .hasAnyRole("OPERATOR", "ADMIN")
+                
+                // 5. VIEWER & FINANCE
+                .requestMatchers("/api/v1/invoices/**")
+                    .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
+                
+                // Everything else requires authentication
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider()) 
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-    return http.build();
-}
+        return http.build();
+    }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Added https://hoppscotch.io to the allowed origins
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000", 
             "https://openfloat.vercel.app",
@@ -70,8 +79,6 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        
-        // Changed to allow all headers so Hoppscotch doesn't trigger a strict header rejection
         configuration.setAllowedHeaders(Arrays.asList("*")); 
         configuration.setAllowCredentials(true);
         
