@@ -1,7 +1,6 @@
 package com.openfloat.middleware.security;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -38,14 +37,21 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 
-                // 0. EXPLICITLY ALLOW CORS PREFLIGHT: Prevents Vercel/Browser 403 blocks
+                // 0. EXPLICITLY ALLOW CORS PREFLIGHT
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
                 // 1. PUBLIC: Authentication endpoints & Spring Error page
                 .requestMatchers("/api/v1/auth/**", "/error").permitAll()
                 
-                // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
-                .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
+                // 2. PUBLIC: Safaricom Callbacks MUST bypass security
+                // FIXED: Explicitly whitelisted the actual Daraja callback URL
+                .requestMatchers(
+                        "/api/v1/callbacks/**", 
+                        "/api/v1/callback/**", 
+                        "/api/v1/payments/callback",
+                        "/api/v1/b2c/result",
+                        "/api/v1/b2c/timeout"
+                ).permitAll()
                 
                 // 3. ADMIN CONSOLE: Strict Admin lock
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
