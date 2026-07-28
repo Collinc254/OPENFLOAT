@@ -1,6 +1,8 @@
 package com.openfloat.middleware.security;
 
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,6 +20,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.openfloat.middleware.repository.UserRepository;
 
 import java.util.Arrays;
 
@@ -59,6 +63,17 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
+}
+
+
+@Bean
+public CommandLineRunner syncAdminPassword(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    return args -> {
+        userRepository.findByUsername("admin@openfloat.com").ifPresent(admin -> {
+            admin.setPassword(passwordEncoder.encode(System.getenv().getOrDefault("ADMIN_PASSWORD", "demo123")));
+            userRepository.save(admin);
+        });
+    };
 }
 
    @Bean
