@@ -98,7 +98,14 @@ export default function OperatorDashboard() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       pollInterval = setInterval(() => {
-        fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`)
+        // --- POLLING FIX INJECTED HERE ---
+        const token = localStorage.getItem('token');
+
+        fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
           .then((res) => {
             if (!res.ok) throw new Error('Transaction not found yet');
             return res.json();
@@ -154,10 +161,14 @@ export default function OperatorDashboard() {
         : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
 
       if (processingMode === 'single') {
+        // --- STK FIX INJECTED HERE ---
+        const token = localStorage.getItem('token'); 
+
         const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` 
           },
           body: JSON.stringify(payload),
         });
