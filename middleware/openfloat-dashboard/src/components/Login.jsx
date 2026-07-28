@@ -29,6 +29,9 @@ export default function Login({ onSuccessfulLogin }) {
       // If successful, extract the real JWT token
       const data = await response.json();
 
+      // ---> THIS IS THE FIX: SAVE THE TOKEN TO THE BROWSER <---
+      localStorage.setItem('token', data.token);
+
       // Pass the real token to the main app layout
       onSuccessfulLogin({
         username: username,
