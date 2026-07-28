@@ -28,27 +28,38 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable())
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .authorizeHttpRequests(auth -> auth
+            // 1. PUBLIC: Authentication endpoints & Spring Error page
+            .requestMatchers("/api/v1/auth/**", "/error").permitAll()
+            
+            // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
+            .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
+            
+            // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
+            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+            
+            // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
+            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
+                .hasAnyRole("OPERATOR", "ADMIN")
+            
+            // 5. VIEWER & FINANCE: Viewing Invoices and History
+            .requestMatchers("/api/v1/invoices/**")
+                .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
+            
+            // Everything else requires a valid JWT token
+            .anyRequest().authenticated()
+        )
+        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authenticationProvider(authenticationProvider()) 
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-   @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/invoices/**").permitAll()
-                .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
-                .requestMatchers("/api/v1/c2b/**").permitAll() // <-- UPDATED TO 
-                .requestMatchers("/api/v1/b2c/**").permitAll()
-                .requestMatchers("/error").permitAll()
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider()) 
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
+    return http.build();
+}
 
    @Bean
     public CorsConfigurationSource corsConfigurationSource() {

@@ -3,7 +3,9 @@ package com.openfloat.middleware.model;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Convert; // <-- ADDED
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.openfloat.middleware.security.AttributeEncryptor; // <-- ADDED
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,7 +18,10 @@ public class MpesaTransaction {
     private String id;
 
     private String mpesaRef;
+
+    @Convert(converter = AttributeEncryptor.class) // <-- AES-256 ENCRYPTION APPLIED HERE
     private String phone;
+
     private BigDecimal amount;
     private String type;
     private String status;
