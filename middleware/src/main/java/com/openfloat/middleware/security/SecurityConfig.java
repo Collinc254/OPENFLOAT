@@ -42,16 +42,17 @@ public class SecurityConfig {
                 // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
                 .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
                 
+                
                 // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                
-                // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
-                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
-                    .hasAnyRole("OPERATOR", "ADMIN")
-                
-                // 5. VIEWER & FINANCE: Viewing Invoices and History
-                .requestMatchers("/api/v1/invoices/**")
-                    .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
+            .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
+            
+            // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
+            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
+                .hasAnyAuthority("OPERATOR", "ADMIN", "ROLE_OPERATOR", "ROLE_ADMIN")
+            
+            // 5. VIEWER & FINANCE: Viewing Invoices and History
+            .requestMatchers("/api/v1/invoices/**")
+                .hasAnyAuthority("VIEWER", "FINANCE", "OPERATOR", "ADMIN", "ROLE_VIEWER", "ROLE_FINANCE", "ROLE_OPERATOR", "ROLE_ADMIN")
                 
                 // Everything else requires a valid JWT token
                 .anyRequest().authenticated()
