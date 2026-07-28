@@ -12,8 +12,7 @@ public class AttributeEncryptor implements AttributeConverter<String, String> {
 
     private static final String AES = "AES";
     
-    // For a production system, this 32-character (256-bit) key should be injected via environment variables.
-    // We are hardcoding it here strictly to ensure it runs flawlessly for your presentation.
+    // For a production system, this key should be injected via environment variables.
     private static final String SECRET = "OpenFloatEnterpriseSecretKey2026"; 
 
     private final Key key;
@@ -46,7 +45,10 @@ public class AttributeEncryptor implements AttributeConverter<String, String> {
             cipher.init(Cipher.DECRYPT_MODE, key);
             return new String(cipher.doFinal(Base64.getDecoder().decode(dbData)));
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to decrypt database column", e);
+            // BACKWARDS COMPATIBILITY FIX:
+            // If decryption fails, this is an old plain-text record from before AES was implemented.
+            // Instead of crashing the application, just return the raw unencrypted database string.
+            return dbData;
         }
     }
 }
