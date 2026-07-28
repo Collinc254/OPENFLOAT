@@ -20,6 +20,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.boot.CommandLineRunner;
+import com.openfloat.middleware.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.openfloat.middleware.repository.UserRepository;
 
@@ -67,11 +70,20 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
 
 
 @Bean
-public CommandLineRunner syncAdminPassword(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+public CommandLineRunner syncAdminPassword(
+        UserRepository userRepository, 
+        PasswordEncoder passwordEncoder,
+        @Value("${ADMIN_PASSWORD:demo123}") String newPassword) {
+            
     return args -> {
-        userRepository.findByUsername("admin@openfloat.com").ifPresent(admin -> {
-            admin.setPassword(passwordEncoder.encode(System.getenv().getOrDefault("ADMIN_PASSWORD", "demo123")));
+        System.out.println(">>> RUNNING PASSWORD SYNC...");
+        
+        userRepository.findByUsername("admin@openfloat.com").ifPresentOrElse(admin -> {
+            admin.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(admin);
+            System.out.println(">>> SUCCESS: Admin password updated in database!");
+        }, () -> {
+            System.out.println(">>> ERROR: Could not find user 'admin@openfloat.com' in the database. Password was NOT updated.");
         });
     };
 }
