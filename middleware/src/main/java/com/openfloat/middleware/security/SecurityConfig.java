@@ -31,40 +31,33 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(auth -> auth
-                // 1. PUBLIC: Authentication endpoints & Spring Error page
-                .requestMatchers("/api/v1/auth/**", "/error").permitAll()
-                
-                // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
-                .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
-                
-                
-               // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
-            .requestMatchers("/api/v1/admin/**")
-                .hasAnyAuthority("ADMIN", "ROLE_ADMIN")
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable())
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .authorizeHttpRequests(auth -> auth
+            // 1. PUBLIC: Authentication endpoints & Spring Error page
+            .requestMatchers("/api/v1/auth/**", "/error").permitAll()
             
-            // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
-            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
-                .hasAnyAuthority("OPERATOR", "ADMIN", "ROLE_OPERATOR", "ROLE_ADMIN")
+            // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
+            .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
             
-            // 5. VIEWER & FINANCE: Viewing Invoices and History
-            .requestMatchers("/api/v1/invoices/**")
-                .hasAnyAuthority("VIEWER", "FINANCE", "OPERATOR", "ADMIN", "ROLE_VIEWER", "ROLE_FINANCE", "ROLE_OPERATOR", "ROLE_ADMIN")
-                
-                // Everything else requires a valid JWT token
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider()) 
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // 3. ADMIN CONSOLE: Restricted to Admin users
+            .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
+            
+            // 4. PAYMENTS & TRANSACTIONS: Any valid logged-in user with a JWT token can execute
+            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**", "/api/v1/invoices/**")
+                .authenticated()
+            
+            // Everything else requires authentication
+            .anyRequest().authenticated()
+        )
+        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authenticationProvider(authenticationProvider()) 
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
-
+    return http.build();
+}
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
