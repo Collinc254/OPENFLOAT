@@ -31,22 +31,28 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         
-        // 1. Seed the Admin User
+        // 1. Seed or Update the Admin User
         if (adminUsername == null || adminUsername.trim().isEmpty() || 
             adminPassword == null || adminPassword.trim().isEmpty()) {
             log.warn("CRITICAL: Admin environment variables are empty. Skipping admin database seeding.");
         } else {
-            if (userRepository.findByUsername(adminUsername.trim()).isEmpty()) {
-                SystemUser admin = new SystemUser();
-                admin.setUsername(adminUsername.trim());
-                admin.setPassword(passwordEncoder.encode(adminPassword.trim()));
-                admin.setRole("ADMIN");
+            userRepository.findByUsername(adminUsername.trim()).ifPresentOrElse(
+                existingAdmin -> {
+                    // Update password on every startup to match Render ENV
+                    existingAdmin.setPassword(passwordEncoder.encode(adminPassword.trim()));
+                    userRepository.save(existingAdmin);
+                    log.info("SUCCESS: Admin password successfully synced with Render ENV!");
+                },
+                () -> {
+                    SystemUser admin = new SystemUser();
+                    admin.setUsername(adminUsername.trim());
+                    admin.setPassword(passwordEncoder.encode(adminPassword.trim()));
+                    admin.setRole("ADMIN");
 
-                userRepository.save(admin);
-                log.info("SUCCESS: Default Admin user created securely!");
-            } else {
-                log.info("Admin user already exists. Skipping setup.");
-            }
+                    userRepository.save(admin);
+                    log.info("SUCCESS: Default Admin user created securely!");
+                }
+            );
         }
 
         // 2. Seed the Default Gateway Tenant

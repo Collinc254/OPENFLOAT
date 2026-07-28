@@ -1,10 +1,7 @@
-
 package com.openfloat.middleware.security;
 
-import com.openfloat.middleware.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value; // <-- MISSING IMPORT
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,60 +29,41 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
-@Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .authorizeHttpRequests(auth -> auth
-            // 1. PUBLIC: Authentication endpoints & Spring Error page
-            .requestMatchers("/api/v1/auth/**", "/error").permitAll()
-            
-            // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
-            .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
-            
-            // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
-            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-            
-            // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
-            .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
-                .hasAnyRole("OPERATOR", "ADMIN")
-            
-            // 5. VIEWER & FINANCE: Viewing Invoices and History
-            .requestMatchers("/api/v1/invoices/**")
-                .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
-            
-            // Everything else requires a valid JWT token
-            .anyRequest().authenticated()
-        )
-        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authenticationProvider(authenticationProvider()) 
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-    return http.build();
-}
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                // 1. PUBLIC: Authentication endpoints & Spring Error page
+                .requestMatchers("/api/v1/auth/**", "/error").permitAll()
+                
+                // 2. PUBLIC: Safaricom Callbacks MUST bypass security so Daraja can deliver receipts
+                .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
+                
+                // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                
+                // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
+                .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
+                    .hasAnyRole("OPERATOR", "ADMIN")
+                
+                // 5. VIEWER & FINANCE: Viewing Invoices and History
+                .requestMatchers("/api/v1/invoices/**")
+                    .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
+                
+                // Everything else requires a valid JWT token
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider()) 
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
+        return http.build();
+    }
 
-@Bean
-public CommandLineRunner syncAdminPassword(
-        UserRepository userRepository, 
-        PasswordEncoder passwordEncoder,
-        @Value("${ADMIN_PASSWORD:demo123}") String newPassword) {
-            
-    return args -> {
-        System.out.println(">>> RUNNING PASSWORD SYNC...");
-        
-        userRepository.findByUsername("admin@openfloat.com").ifPresentOrElse(admin -> {
-            admin.setPassword(passwordEncoder.encode(newPassword));
-            userRepository.save(admin);
-            System.out.println(">>> SUCCESS: Admin password updated in database!");
-        }, () -> {
-            System.out.println(">>> ERROR: Could not find user 'admin@openfloat.com' in the database. Password was NOT updated.");
-        });
-    };
-}
-
-   @Bean
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
