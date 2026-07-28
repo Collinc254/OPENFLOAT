@@ -43,8 +43,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/callbacks/**", "/api/v1/callback/**").permitAll()
                 
                 
-                // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
-            .requestMatchers("/api/v1/admin/**").hasAnyAuthority("ADMIN", "ROLE_ADMIN")
+               // 3. ADMIN ONLY: Admin Console, Key Rotation, and System Config
+            .requestMatchers("/api/v1/admin/**")
+                .hasAnyAuthority("ADMIN", "ROLE_ADMIN")
             
             // 4. OPERATOR & ADMIN: Executing Payments (STK, B2C, C2B)
             .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
