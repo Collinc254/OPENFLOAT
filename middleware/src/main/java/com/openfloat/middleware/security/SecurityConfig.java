@@ -1,7 +1,9 @@
+
 package com.openfloat.middleware.security;
 
+import com.openfloat.middleware.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-
+import org.springframework.beans.factory.annotation.Value; // <-- MISSING IMPORT
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,11 +22,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.boot.CommandLineRunner;
-import com.openfloat.middleware.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
-
-import com.openfloat.middleware.repository.UserRepository;
 
 import java.util.Arrays;
 
