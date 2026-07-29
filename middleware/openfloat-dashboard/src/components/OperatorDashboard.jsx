@@ -5,7 +5,7 @@ export default function OperatorDashboard() {
   const [processingMode, setProcessingMode] = useState('single');
   const [transactionType, setTransactionType] = useState('STK Push');
   
-  // Single transaction state (CHANGED: Empty defaults)
+  // Single transaction state 
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [amount, setAmount] = useState('');
@@ -17,16 +17,17 @@ export default function OperatorDashboard() {
   const fileInputRef = useRef(null);
 
   // Global submission & polling state
-  const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'polling' | 'success' | 'error'
+  const [status, setStatus] = useState('idle'); 
   const [message, setMessage] = useState('');
   const [activeTxRef, setActiveTxRef] = useState(null);
 
+  // === CRITICAL FIX 1: THE SYNCHRONOUS SUBMIT LOCK ===
+  const submitLock = useRef(false);
+
   // --- 1. INPUT VALIDATION & AUTO-FORMATTING ---
   const handlePhoneChange = (e) => {
-    // Strip all non-numeric characters
     const cleaned = e.target.value.replace(/\D/g, '');
     
-    // Auto-format as: 254 7XX XXX XXX
     let formatted = cleaned;
     if (cleaned.length > 3) formatted = cleaned.slice(0, 3) + ' ' + cleaned.slice(3);
     if (cleaned.length > 6) formatted = formatted.slice(0, 7) + ' ' + formatted.slice(7);
@@ -34,7 +35,6 @@ export default function OperatorDashboard() {
 
     setPhone(formatted);
 
-    // CHANGED: Smart real-time validation (no more aggressive 12-digit warning while typing)
     if (cleaned.length > 0) {
       const typedPrefix = cleaned.substring(0, 3);
       if (!'254'.startsWith(typedPrefix)) {
@@ -101,7 +101,6 @@ export default function OperatorDashboard() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       pollInterval = setInterval(() => {
-        // --- POLLING FIX INJECTED HERE ---
         const token = localStorage.getItem('token');
 
         fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`, {
@@ -120,12 +119,14 @@ export default function OperatorDashboard() {
               setStatus('success');
               setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
+              submitLock.current = false; // RELEASE LOCK ON SUCCESS
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
               setMessage('Failed');
               setActiveTxRef(null);
+              submitLock.current = false; // RELEASE LOCK ON FAIL
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
@@ -136,6 +137,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
+        submitLock.current = false; // RELEASE LOCK ON TIMEOUT
       }, 90000);
     }
 
@@ -149,16 +151,23 @@ export default function OperatorDashboard() {
   const handleExecute = async (e) => {
     e.preventDefault();
 
-    // CHANGED: Enforce the 12-digit rule ONLY when clicking the execute button
+    // === LOCK ENGAGED: Physically blocks double-clicks ===
+    if (submitLock.current) return;
+    submitLock.current = true;
+
     if (processingMode === 'single') {
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length !== 12) {
         setPhoneError('Number must be exactly 12 digits');
+        submitLock.current = false; // Unlock if validation fails
         return;
       }
     }
 
-    if (phoneError) return; 
+    if (phoneError) {
+      submitLock.current = false; // Unlock if validation fails
+      return; 
+    }
     
     setStatus('loading');
     setMessage('');
@@ -167,14 +176,16 @@ export default function OperatorDashboard() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       const cleanPhone = phone.replace(/\s/g, '');
-      const txRef = `INV-${Date.now()}`;
+      
+      // === CRITICAL FIX 2: UNIQUE ID GENERATOR ===
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const txRef = `INV-${Date.now()}-${randomSuffix}`;
       
       const payload = processingMode === 'single' 
         ? { type: transactionType, amount: parseFloat(amount), msisdn: cleanPhone, invoiceRef: txRef, tenantId: "ORG-001" }
         : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
 
       if (processingMode === 'single') {
-        // --- STK FIX INJECTED HERE ---
         const token = localStorage.getItem('token'); 
 
         const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
@@ -206,6 +217,11 @@ export default function OperatorDashboard() {
       console.error('Payment Error:', error);
       setStatus('error');
       setMessage('Network error. Unable to reach the OpenFloat servers.');
+    } finally {
+      // Unlock immediately ONLY if it's a batch upload OR a network error prevented polling from starting
+      if (processingMode !== 'single' || status === 'error') {
+        submitLock.current = false;
+      }
     }
   };
 
