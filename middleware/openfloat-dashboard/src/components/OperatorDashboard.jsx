@@ -5,10 +5,10 @@ export default function OperatorDashboard() {
   const [processingMode, setProcessingMode] = useState('single');
   const [transactionType, setTransactionType] = useState('STK Push');
   
-  // Single transaction state
-  const [phone, setPhone] = useState('254 705 425 117');
+  // Single transaction state (CHANGED: Empty defaults)
+  const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [amount, setAmount] = useState('1');
+  const [amount, setAmount] = useState('');
   
   // Batch transaction state
   const [batchFile, setBatchFile] = useState(null);
@@ -34,11 +34,14 @@ export default function OperatorDashboard() {
 
     setPhone(formatted);
 
-    // Real-time validation feedback
-    if (cleaned.length > 0 && !cleaned.startsWith('254')) {
-      setPhoneError('Number must start with country code 254');
-    } else if (cleaned.length > 0 && cleaned.length !== 12) {
-      setPhoneError('Number must be exactly 12 digits');
+    // CHANGED: Smart real-time validation (no more aggressive 12-digit warning while typing)
+    if (cleaned.length > 0) {
+      const typedPrefix = cleaned.substring(0, 3);
+      if (!'254'.startsWith(typedPrefix)) {
+        setPhoneError('Number must start with country code 254');
+      } else {
+        setPhoneError(''); 
+      }
     } else {
       setPhoneError('');
     }
@@ -145,6 +148,16 @@ export default function OperatorDashboard() {
   // --- SUBMISSION LOGIC ---
   const handleExecute = async (e) => {
     e.preventDefault();
+
+    // CHANGED: Enforce the 12-digit rule ONLY when clicking the execute button
+    if (processingMode === 'single') {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 12) {
+        setPhoneError('Number must be exactly 12 digits');
+        return;
+      }
+    }
+
     if (phoneError) return; 
     
     setStatus('loading');
