@@ -4,17 +4,25 @@ import OperatorDashboard from './components/OperatorDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
-// 1. IMPORT THE NEW PAYMENT FORM HERE
 import B2CPaymentForm from './components/B2CPaymentForm'; 
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('operator'); 
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // 1. SMART DEFAULT: Starts open on desktop, closed on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+  };
+
+  // 2. AUTO-CLOSE: Automatically hides the sidebar on mobile after selecting a tab
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
   };
 
   if (!user) {
@@ -22,10 +30,22 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex relative overflow-hidden">
       
-      {/* Left Sidebar Navigation */}
-      <aside className={`bg-slate-900 text-white flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+      {/* 3. MOBILE BACKDROP: Click outside the sidebar to close it on mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* 4. RESPONSIVE SIDEBAR */}
+      <aside className={`
+        bg-slate-900 text-white flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden
+        fixed md:relative h-full
+        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}
+      `}>
         
         {/* Portal Branding */}
         <div className={`p-6 border-b border-slate-800 flex items-center h-20 ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
@@ -44,7 +64,7 @@ export default function App() {
           <ul className="space-y-2 px-3">
             <li>
               <button 
-                onClick={() => setActiveTab('operator')}
+                onClick={() => handleTabChange('operator')}
                 title="Operator Dashboard"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'operator' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
@@ -55,14 +75,12 @@ export default function App() {
               </button>
             </li>
 
-            {/* 2. ADD THE B2C PAYOUTS BUTTON HERE */}
             <li>
               <button 
-                onClick={() => setActiveTab('payouts')}
+                onClick={() => handleTabChange('payouts')}
                 title="B2C Payouts"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
-                {/* Money SVG Icon */}
                 <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
                   B2C Payouts
@@ -72,7 +90,7 @@ export default function App() {
 
             <li>
               <button 
-                onClick={() => setActiveTab('finance')}
+                onClick={() => handleTabChange('finance')}
                 title="Finance & Recon"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
@@ -82,9 +100,10 @@ export default function App() {
                 </span>
               </button>
             </li>
+            
             <li>
               <button 
-                onClick={() => setActiveTab('admin')}
+                onClick={() => handleTabChange('admin')}
                 title="Admin Console"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'admin' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
@@ -94,9 +113,10 @@ export default function App() {
                 </span>
               </button>
             </li>
+            
             <li>
               <button 
-                onClick={() => setActiveTab('viewer')}
+                onClick={() => handleTabChange('viewer')}
                 title="Audit Viewer"
                 className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'viewer' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
               >
@@ -118,7 +138,7 @@ export default function App() {
               <p className="text-xs text-green-400 mt-0.5">{user.role} Access</p>
             </div>
           ) : (
-            <div className="mb-4 pt-2">
+            <div className="mb-4 pt-2 hidden md:block">
               <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-200 font-bold border border-slate-700 shadow-inner">
                 {user.username.charAt(0).toUpperCase()}
               </div>
@@ -137,10 +157,10 @@ export default function App() {
       </aside>
 
       {/* Right Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative w-full">
         
         {/* Dynamic Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center shadow-sm z-10 h-20">
+        <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center shadow-sm z-10 h-20 shrink-0">
           
           {/* Toggle Hamburger Button */}
           <button 
@@ -152,7 +172,7 @@ export default function App() {
             </svg>
           </button>
 
-          <h2 className="text-2xl font-bold text-slate-800 capitalize">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
             {activeTab === 'finance' ? 'Finance & Reconciliation' : 
              activeTab === 'payouts' ? 'B2C Payouts' : 
              `${activeTab} Dashboard`}
@@ -160,10 +180,9 @@ export default function App() {
         </header>
         
         {/* Scrollable Workspace */}
-        <div className="flex-1 p-8 overflow-y-auto bg-slate-50 relative">
-          <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 relative">
+          <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100">
             
-            {/* 3. ADD THE COMPONENT TO YOUR SWITCHBOARD HERE */}
             {activeTab === 'operator' && <OperatorDashboard />}
             {activeTab === 'payouts' && <B2CPaymentForm />}
             {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
