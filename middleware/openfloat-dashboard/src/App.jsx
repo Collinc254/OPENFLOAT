@@ -7,17 +7,28 @@ import AuditViewer from './components/AuditViewer';
 import B2CPaymentForm from './components/B2CPaymentForm'; 
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('operator'); 
+  // 1. SMART INITIALIZATION: Check for existing session on page refresh
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('openfloat_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   
-  // 1. SMART DEFAULT: Starts open on desktop, closed on mobile
+  const [activeTab, setActiveTab] = useState('operator'); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+    // 2. SAVE SESSION: Store user details in browser to survive refreshes
+    localStorage.setItem('openfloat_user', JSON.stringify(userData));
   };
 
-  // 2. AUTO-CLOSE: Automatically hides the sidebar on mobile after selecting a tab
+  const handleLogout = () => {
+    setUser(null);
+    // 3. SECURE LOGOUT: Destroy session and tokens
+    localStorage.removeItem('openfloat_user');
+    localStorage.removeItem('token');
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     if (window.innerWidth < 768) {
@@ -32,7 +43,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex relative overflow-hidden">
       
-      {/* 3. MOBILE BACKDROP: Click outside the sidebar to close it on mobile */}
+      {/* MOBILE BACKDROP */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden transition-opacity"
@@ -40,7 +51,7 @@ export default function App() {
         />
       )}
 
-      {/* 4. RESPONSIVE SIDEBAR */}
+      {/* RESPONSIVE SIDEBAR */}
       <aside className={`
         bg-slate-900 text-white flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden
         fixed md:relative h-full
@@ -146,7 +157,7 @@ export default function App() {
           )}
           
           <button 
-            onClick={() => setUser(null)}
+            onClick={handleLogout}
             title="Sign Out"
             className={`flex justify-center items-center py-2.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 hover:text-red-300 transition-colors text-sm font-semibold border border-red-500/20 ${isSidebarOpen ? 'w-full gap-2' : 'w-10 h-10 p-0 rounded-full'}`}
           >
