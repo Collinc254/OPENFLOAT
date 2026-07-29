@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -15,13 +17,23 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final StkPushService stkPushService;
-
+    
+    
+    @GetMapping
+    public ResponseEntity<?> getAllTransactions() {
+        log.info("Frontend requested live database transactions.");
+        
+        
+        return ResponseEntity.ok("[]");
+    }
+    
     @PostMapping("/trigger")
     public ResponseEntity<DarajaStkPushResponse> triggerStkPush(@RequestBody StkPushRequest request) {
         DarajaStkPushResponse response = stkPushService.sendPush(request);
         return ResponseEntity.ok(response);
     }
 
+    
     @PostMapping("/callback")
     public ResponseEntity<String> handleCallback(@RequestBody String rawJson) {
         log.info("Controller received incoming payload at /api/v1/payments/callback");
