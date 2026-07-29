@@ -21,7 +21,7 @@ export default function OperatorDashboard() {
   const [message, setMessage] = useState('');
   const [activeTxRef, setActiveTxRef] = useState(null);
 
-  // === CRITICAL FIX 1: THE SYNCHRONOUS SUBMIT LOCK ===
+  // The synchronous submit lock
   const submitLock = useRef(false);
 
   // --- 1. INPUT VALIDATION & AUTO-FORMATTING ---
@@ -119,14 +119,14 @@ export default function OperatorDashboard() {
               setStatus('success');
               setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
-              submitLock.current = false; // RELEASE LOCK ON SUCCESS
+              submitLock.current = false; 
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
               setMessage('Failed');
               setActiveTxRef(null);
-              submitLock.current = false; // RELEASE LOCK ON FAIL
+              submitLock.current = false; 
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
@@ -137,7 +137,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
-        submitLock.current = false; // RELEASE LOCK ON TIMEOUT
+        submitLock.current = false; 
       }, 90000);
     }
 
@@ -151,7 +151,6 @@ export default function OperatorDashboard() {
   const handleExecute = async (e) => {
     e.preventDefault();
 
-    // === LOCK ENGAGED: Physically blocks double-clicks ===
     if (submitLock.current) return;
     submitLock.current = true;
 
@@ -159,13 +158,13 @@ export default function OperatorDashboard() {
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length !== 12) {
         setPhoneError('Number must be exactly 12 digits');
-        submitLock.current = false; // Unlock if validation fails
+        submitLock.current = false; 
         return;
       }
     }
 
     if (phoneError) {
-      submitLock.current = false; // Unlock if validation fails
+      submitLock.current = false; 
       return; 
     }
     
@@ -177,7 +176,6 @@ export default function OperatorDashboard() {
       
       const cleanPhone = phone.replace(/\s/g, '');
       
-      // === CRITICAL FIX 2: UNIQUE ID GENERATOR ===
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const txRef = `INV-${Date.now()}-${randomSuffix}`;
       
@@ -218,7 +216,6 @@ export default function OperatorDashboard() {
       setStatus('error');
       setMessage('Network error. Unable to reach the OpenFloat servers.');
     } finally {
-      // Unlock immediately ONLY if it's a batch upload OR a network error prevented polling from starting
       if (processingMode !== 'single' || status === 'error') {
         submitLock.current = false;
       }
@@ -226,39 +223,39 @@ export default function OperatorDashboard() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full max-w-4xl mx-auto flex flex-col">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
       
-      {/* Restored Header Section - COMPACT PADDING */}
+      {/* ONE UNIFIED CARD: Top Dark Section */}
       <div className="bg-slate-900 border-b border-slate-800">
-        <div className="px-6 py-5 sm:px-8 flex flex-col justify-center text-center">
+        <div className="px-6 py-6 sm:px-10 flex flex-col justify-center text-center">
           <h2 className="text-xl font-bold text-white tracking-wide">Manual B2C / STK Trigger</h2>
-          <p className="text-slate-400 text-xs mt-1">Initiate a single payment or process a mass disbursement</p>
+          <p className="text-slate-400 text-sm mt-1">Initiate a single payment or process a mass disbursement</p>
         </div>
         
-        {/* Centered Tabs - COMPACT PADDING */}
         <div className="flex justify-center px-6 gap-8">
           <button 
             onClick={() => { setProcessingMode('single'); setStatus('idle'); setMessage(''); }}
-            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
           >
             Single Transaction
           </button>
           <button 
             onClick={() => { setProcessingMode('batch'); setStatus('idle'); setMessage(''); setTransactionType('B2C Salary'); }}
-            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
           >
             Batch Upload (CSV)
           </button>
         </div>
       </div>
 
-      {/* Symmetrical Centered Form Section - COMPACT PADDING */}
-      <div className="p-4 sm:p-6 bg-slate-50 flex-1 flex flex-col justify-center">
-        <div className="max-w-2xl w-full mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <form onSubmit={handleExecute} className="space-y-4">
+      {/* ONE UNIFIED CARD: Bottom White Section */}
+      <div className="p-6 sm:p-8">
+        {/* CENTERED CONTENT WRAPPER: Fixes the slanted layout seamlessly */}
+        <div className="max-w-xl mx-auto w-full">
+          <form onSubmit={handleExecute} className="space-y-5">
             
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Transaction Type</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Transaction Type</label>
               <div className="relative">
                 <select
                   value={transactionType}
@@ -279,9 +276,9 @@ export default function OperatorDashboard() {
             <hr className="border-slate-100" />
 
             {processingMode === 'single' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Target M-Pesa Number</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Target M-Pesa Number</label>
                   <input 
                     type="text" 
                     value={phone}
@@ -299,7 +296,7 @@ export default function OperatorDashboard() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Amount (KES)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Amount (KES)</label>
                   <input 
                     type="number" 
                     value={amount}
@@ -367,10 +364,10 @@ export default function OperatorDashboard() {
             <button 
               type="submit" 
               disabled={status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
-              className={`w-full py-3.5 rounded-lg font-bold text-white transition-all flex justify-center items-center gap-2 mt-4
+              className={`w-full py-3.5 rounded-lg font-bold text-white transition-all flex justify-center items-center gap-2 mt-2
                 ${status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
                   ? 'bg-slate-300 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 shadow-sm hover:shadow-md'}`}
+                  : 'bg-green-600 hover:bg-green-700 shadow-sm hover:shadow'}`}
             >
                {status === 'loading' && 'Initiating Request...'}
                {status === 'polling' && (
