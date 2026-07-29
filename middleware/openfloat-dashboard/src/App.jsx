@@ -41,7 +41,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex relative overflow-hidden">
+    // STRICT 100VH LOCK: Changed min-h-screen to h-screen to prevent overall page scrolling
+    <div className="h-screen w-full bg-slate-50 flex relative overflow-hidden">
       
       {/* MOBILE BACKDROP */}
       {isSidebarOpen && (
@@ -51,7 +52,7 @@ export default function App() {
         />
       )}
 
-      {/* RESPONSIVE SIDEBAR */}
+      {/* RESPONSIVE SIDEBAR: Height perfectly matches the main content */}
       <aside className={`
         bg-slate-900 text-white flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden
         fixed md:relative h-full
@@ -59,7 +60,7 @@ export default function App() {
       `}>
         
         {/* Portal Branding */}
-        <div className={`p-6 border-b border-slate-800 flex items-center h-20 ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
+        <div className={`p-6 border-b border-slate-800 flex items-center h-20 shrink-0 ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
           {isSidebarOpen ? (
             <div className="animate-in fade-in duration-300">
               <h1 className="text-2xl font-bold tracking-wide">OpenFloat</h1>
@@ -141,7 +142,7 @@ export default function App() {
         </nav>
 
         {/* User Profile & Logout */}
-        <div className={`p-4 border-t border-slate-800 bg-slate-950 transition-all ${isSidebarOpen ? '' : 'flex flex-col items-center'}`}>
+        <div className={`p-4 border-t border-slate-800 bg-slate-950 shrink-0 transition-all ${isSidebarOpen ? '' : 'flex flex-col items-center'}`}>
           {isSidebarOpen ? (
             <div className="mb-4 animate-in fade-in duration-300">
               <p className="text-xs text-slate-500 uppercase tracking-wider">Logged in as</p>
@@ -190,17 +191,22 @@ export default function App() {
           </h2>
         </header>
         
-        {/* Scrollable Workspace */}
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 relative">
-          <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100">
-            
-            {activeTab === 'operator' && <OperatorDashboard />}
-            {activeTab === 'payouts' && <B2CPaymentForm />}
-            {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
-            {activeTab === 'admin' && <AdminConsole />}
-            {activeTab === 'viewer' && <AuditViewer token={user.token} />}
-
-          </div>
+        {/* SEAMLESS WORKSPACE: Removed outer paddings and borders for the Operator tab */}
+        <div className="flex-1 overflow-hidden bg-slate-50 relative flex flex-col w-full h-full">
+          {activeTab === 'operator' ? (
+            // Operator dashboard renders flush edge-to-edge with no scrolling
+            <OperatorDashboard />
+          ) : (
+            // Other tabs keep their padded containers to preserve their current designs
+            <div className="p-4 md:p-8 h-full overflow-y-auto">
+              <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100">
+                {activeTab === 'payouts' && <B2CPaymentForm />}
+                {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
+                {activeTab === 'admin' && <AdminConsole />}
+                {activeTab === 'viewer' && <AuditViewer token={user.token} />}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
