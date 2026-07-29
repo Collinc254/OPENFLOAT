@@ -14,19 +14,23 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    // This generates a secure, random 256-bit key for signing the tokens.
-    // Note: In a production environment, you would store a static secret key in application.properties!
-    private final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // 1. FIXED STATIC KEY: This is over 256-bits long and will NEVER change.
+    private static final String SECRET_KEY_STRING = "OpenFloatEnterpriseSecureSecretKey2026!@#$%^&*()";
 
     // Tokens will expire after 10 hours
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 10;
+
+    // 2. HELPER METHOD: Converts the static string into a signing key
+    private Key getSignInKey() {
+        return Keys.hmacShaKeyFor(SECRET_KEY_STRING.getBytes());
+    }
 
     public String generateToken(UserDetails userDetails) {
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(SECRET_KEY)
+                .signWith(getSignInKey()) // Uses the permanent static key
                 .compact();
     }
 
@@ -51,7 +55,7 @@ public class JwtUtil {
 
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(getSignInKey()) // Uses the permanent static key
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
