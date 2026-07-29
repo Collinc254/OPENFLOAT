@@ -169,7 +169,8 @@ export default function App() {
       </aside>
 
       {/* Right Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative w-full">
+      {/* 💥 FIX APPLIED HERE: Removed 'w-full' and enforced 'overflow-x-hidden' 💥 */}
+      <main className="flex-1 flex flex-col h-screen overflow-x-hidden relative">
         
         {/* Dynamic Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center shadow-sm z-10 h-20 shrink-0">
@@ -192,7 +193,7 @@ export default function App() {
         </header>
         
         {/* SEAMLESS WORKSPACE: Removed outer paddings and borders for the Operator tab */}
-        <div className="flex-1 overflow-hidden bg-slate-50 relative flex flex-col w-full h-full">
+        <div className="flex-1 overflow-x-hidden bg-slate-50 relative flex flex-col h-full">
           {activeTab === 'operator' ? (
             // Operator dashboard renders flush edge-to-edge with no scrolling
             <OperatorDashboard />
