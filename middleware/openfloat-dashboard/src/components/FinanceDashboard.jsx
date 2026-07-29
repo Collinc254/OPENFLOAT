@@ -11,8 +11,8 @@ export default function FinanceDashboard({ token }) {
       try {
         const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
         
-        // Include the Authorization Bearer token in the headers
-        const response = await fetch(`${API_URL}/api/v1/transactions`, {
+        // FIXED: Point to the correct /api/v1/payments endpoint
+        const response = await fetch(`${API_URL}/api/v1/payments`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -21,21 +21,20 @@ export default function FinanceDashboard({ token }) {
         });
         
         if (!response.ok) {
-          throw new Error('Failed to fetch live database transactions.');
+          throw new Error(`Server returned ${response.status}. Verify the GET /api/v1/payments endpoint exists in PaymentController.`);
         }
         
         const data = await response.json();
         
-        // Map backend Spring Boot entity fields to frontend table columns
+        // Smart mapping: checks multiple possible Java DTO variable names
         const formattedData = data.map(tx => ({
-          id: tx.id || 'N/A',
-          mpesaRef: tx.mpesaRef || 'PENDING',
-          phone: tx.phone || 'N/A',
-          amount: tx.amount || 0,
-          type: tx.type || 'STK Push',
+          id: tx.id || tx.transactionId || 'N/A',
+          mpesaRef: tx.mpesaRef || tx.receiptNumber || tx.receipt || 'PENDING',
+          phone: tx.phone || tx.msisdn || tx.phoneNumber || 'N/A',
+          amount: tx.amount || tx.totalAmount || 0,
+          type: tx.type || tx.transactionType || 'STK Push',
           status: tx.status || 'PENDING',
-          // Java already formats this nicely via @JsonFormat
-          date: tx.date || 'Just now' 
+          date: tx.date || tx.createdAt || tx.timestamp || 'Just now' 
         }));
         
         // Sort by newest transactions first
@@ -72,7 +71,7 @@ export default function FinanceDashboard({ token }) {
       {/* Error Banner */}
       {error && (
         <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium">
-          Error: {error} - Please verify the backend endpoint is running.
+          Error: {error}
         </div>
       )}
 
