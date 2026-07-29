@@ -21,7 +21,7 @@ export default function OperatorDashboard() {
   const [message, setMessage] = useState('');
   const [activeTxRef, setActiveTxRef] = useState(null);
 
-  // The synchronous submit lock
+  // === CRITICAL FIX 1: THE SYNCHRONOUS SUBMIT LOCK ===
   const submitLock = useRef(false);
 
   // --- 1. INPUT VALIDATION & AUTO-FORMATTING ---
@@ -119,14 +119,14 @@ export default function OperatorDashboard() {
               setStatus('success');
               setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
-              submitLock.current = false; 
+              submitLock.current = false; // RELEASE LOCK ON SUCCESS
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
               setMessage('Failed');
               setActiveTxRef(null);
-              submitLock.current = false; 
+              submitLock.current = false; // RELEASE LOCK ON FAIL
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
@@ -137,7 +137,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
-        submitLock.current = false; 
+        submitLock.current = false; // RELEASE LOCK ON TIMEOUT
       }, 90000);
     }
 
@@ -151,6 +151,7 @@ export default function OperatorDashboard() {
   const handleExecute = async (e) => {
     e.preventDefault();
 
+    // === LOCK ENGAGED: Physically blocks double-clicks ===
     if (submitLock.current) return;
     submitLock.current = true;
 
@@ -158,13 +159,13 @@ export default function OperatorDashboard() {
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length !== 12) {
         setPhoneError('Number must be exactly 12 digits');
-        submitLock.current = false; 
+        submitLock.current = false; // Unlock if validation fails
         return;
       }
     }
 
     if (phoneError) {
-      submitLock.current = false; 
+      submitLock.current = false; // Unlock if validation fails
       return; 
     }
     
@@ -176,6 +177,7 @@ export default function OperatorDashboard() {
       
       const cleanPhone = phone.replace(/\s/g, '');
       
+      // === CRITICAL FIX 2: UNIQUE ID GENERATOR ===
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const txRef = `INV-${Date.now()}-${randomSuffix}`;
       
@@ -216,6 +218,7 @@ export default function OperatorDashboard() {
       setStatus('error');
       setMessage('Network error. Unable to reach the OpenFloat servers.');
     } finally {
+      // Unlock immediately ONLY if it's a batch upload OR a network error prevented polling from starting
       if (processingMode !== 'single' || status === 'error') {
         submitLock.current = false;
       }
@@ -223,45 +226,45 @@ export default function OperatorDashboard() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full max-w-4xl mx-auto flex flex-col">
       
-      {/* Restored Header Section */}
+      {/* Restored Header Section - COMPACT PADDING */}
       <div className="bg-slate-900 border-b border-slate-800">
-        <div className="px-6 py-8 sm:px-10 flex flex-col justify-center text-center">
-          <h2 className="text-2xl font-bold text-white tracking-wide">Manual B2C / STK Trigger</h2>
-          <p className="text-slate-400 text-sm mt-2">Initiate a single payment or process a mass disbursement</p>
+        <div className="px-6 py-5 sm:px-8 flex flex-col justify-center text-center">
+          <h2 className="text-xl font-bold text-white tracking-wide">Manual B2C / STK Trigger</h2>
+          <p className="text-slate-400 text-xs mt-1">Initiate a single payment or process a mass disbursement</p>
         </div>
         
-        {/* Centered Tabs */}
+        {/* Centered Tabs - COMPACT PADDING */}
         <div className="flex justify-center px-6 gap-8">
           <button 
             onClick={() => { setProcessingMode('single'); setStatus('idle'); setMessage(''); }}
-            className={`pb-4 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
           >
             Single Transaction
           </button>
           <button 
             onClick={() => { setProcessingMode('batch'); setStatus('idle'); setMessage(''); setTransactionType('B2C Salary'); }}
-            className={`pb-4 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
           >
             Batch Upload (CSV)
           </button>
         </div>
       </div>
 
-      {/* Symmetrical Centered Form Section */}
-      <div className="p-6 sm:p-12 bg-slate-50">
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-slate-100">
-          <form onSubmit={handleExecute} className="space-y-6">
+      {/* Symmetrical Centered Form Section - COMPACT PADDING */}
+      <div className="p-4 sm:p-6 bg-slate-50 flex-1 flex flex-col justify-center">
+        <div className="max-w-2xl w-full mx-auto bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+          <form onSubmit={handleExecute} className="space-y-4">
             
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Transaction Type</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Transaction Type</label>
               <div className="relative">
                 <select
                   value={transactionType}
                   onChange={(e) => setTransactionType(e.target.value)}
                   disabled={status === 'polling' || status === 'loading'}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors outline-none text-slate-700 font-medium appearance-none disabled:opacity-50"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors outline-none text-slate-700 font-medium appearance-none disabled:opacity-50"
                 >
                   {processingMode === 'single' && <option value="STK Push">C2B STK Push (Collection)</option>}
                   <option value="B2C Salary">B2C Salary (Disbursement)</option>
@@ -276,33 +279,33 @@ export default function OperatorDashboard() {
             <hr className="border-slate-100" />
 
             {processingMode === 'single' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Target M-Pesa Number</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Target M-Pesa Number</label>
                   <input 
                     type="text" 
                     value={phone}
                     onChange={handlePhoneChange}
                     disabled={status === 'polling' || status === 'loading'}
-                    className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:outline-none text-slate-700 font-mono text-lg tracking-wide disabled:opacity-50 transition-colors
+                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:outline-none text-slate-700 font-mono text-lg tracking-wide disabled:opacity-50 transition-colors
                       ${phoneError ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-slate-200 focus:ring-green-500 focus:border-green-500'}`}
                     required
                   />
                   {phoneError && (
-                    <p className="text-red-500 text-xs font-bold mt-2 flex items-center gap-1">
+                    <p className="text-red-500 text-xs font-bold mt-1.5 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                       {phoneError}
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Amount (KES)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Amount (KES)</label>
                   <input 
                     type="number" 
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     disabled={status === 'polling' || status === 'loading'}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-slate-700 font-medium disabled:opacity-50"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-slate-700 font-medium disabled:opacity-50"
                     min="1"
                     required
                   />
@@ -317,21 +320,21 @@ export default function OperatorDashboard() {
                     className="w-full border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="px-6 py-14 text-center">
-                      <svg className="mx-auto h-12 w-12 text-slate-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                      <div className="mt-4 flex text-sm text-slate-600 justify-center">
+                    <div className="px-6 py-10 text-center">
+                      <svg className="mx-auto h-10 w-10 text-slate-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                      <div className="mt-3 flex text-sm text-slate-600 justify-center">
                         <span className="relative font-bold text-green-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 hover:text-green-500">
                           Upload a CSV file
                         </span>
                         <p className="pl-1">or drag and drop</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">Expected format: Phone, Amount (e.g. 254700111222, 1500)</p>
+                      <p className="text-xs text-slate-500 mt-1">Expected format: Phone, Amount (e.g. 254700111222, 1500)</p>
                     </div>
                     <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={handleFileUpload} />
                   </div>
                 ) : (
-                  <div className="w-full bg-slate-50 rounded-xl border border-slate-200 p-6">
-                    <div className="flex justify-between items-start mb-6 border-b border-slate-200 pb-4">
+                  <div className="w-full bg-slate-50 rounded-xl border border-slate-200 p-5">
+                    <div className="flex justify-between items-start mb-4 border-b border-slate-200 pb-3">
                       <div>
                         <h3 className="font-bold text-slate-800">{batchFile.name}</h3>
                         <p className="text-sm text-slate-500 mt-1">{batchData.length} records parsed successfully</p>
@@ -342,16 +345,16 @@ export default function OperatorDashboard() {
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data Preview</p>
                       {batchData.slice(0, 3).map((row, idx) => (
-                        <div key={idx} className="flex justify-between text-sm bg-white p-3 rounded border border-slate-100 shadow-sm">
+                        <div key={idx} className="flex justify-between text-sm bg-white p-2.5 rounded border border-slate-100 shadow-sm">
                           <span className="font-mono text-slate-600">{row.phone}</span>
                           <span className="font-semibold text-slate-800">KES {row.amount}</span>
                         </div>
                       ))}
                       {batchData.length > 3 && (
-                        <div className="text-center text-xs text-slate-500 font-medium pt-2">
+                        <div className="text-center text-xs text-slate-500 font-medium pt-1">
                           + {batchData.length - 3} more records
                         </div>
                       )}
@@ -364,7 +367,7 @@ export default function OperatorDashboard() {
             <button 
               type="submit" 
               disabled={status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
-              className={`w-full py-4 rounded-lg font-bold text-white transition-all flex justify-center items-center gap-2 mt-4
+              className={`w-full py-3.5 rounded-lg font-bold text-white transition-all flex justify-center items-center gap-2 mt-4
                 ${status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
                   ? 'bg-slate-300 cursor-not-allowed' 
                   : 'bg-green-600 hover:bg-green-700 shadow-sm hover:shadow-md'}`}
@@ -381,7 +384,7 @@ export default function OperatorDashboard() {
           </form>
 
           {message && (
-            <div className={`mt-6 p-4 rounded-lg flex items-start gap-3 text-sm font-medium w-full animate-in fade-in
+            <div className={`mt-5 p-3 rounded-lg flex items-start gap-3 text-sm font-medium w-full animate-in fade-in
               ${status === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : ''}
               ${status === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : ''}
               ${status === 'polling' ? 'bg-blue-50 text-blue-800 border border-blue-200' : ''}
