@@ -5,6 +5,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
 import B2CPaymentForm from './components/B2CPaymentForm'; 
+import ClientManagement from './components/ClientManagement'; // 1. Added Import
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -24,7 +25,7 @@ export default function App() {
     setUser(null);
     localStorage.removeItem('openfloat_user');
     localStorage.removeItem('token');
-    localStorage.removeItem('role'); // Clearing the role we added earlier
+    localStorage.removeItem('role'); 
   };
 
   // === ROLE-BASED ACCESS CONTROL (RBAC) LOGIC ===
@@ -32,8 +33,8 @@ export default function App() {
   const isAdmin = user?.role === 'ADMIN';
 
   const handleTabChange = (tab) => {
-    // 1. STRICT STATE GUARD: Prevent unauthorized state changes
-    if ((tab === 'payouts' || tab === 'finance') && !isManagerOrAdmin) {
+    // 1. STRICT STATE GUARD: Prevent unauthorized state changes (Added 'clients' here)
+    if ((tab === 'payouts' || tab === 'finance' || tab === 'clients') && !isManagerOrAdmin) {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
     }
@@ -136,6 +137,20 @@ export default function App() {
                     </span>
                   </button>
                 </li>
+                
+                {/* 2. Added API Gateway Button */}
+                <li>
+                  <button 
+                    onClick={() => handleTabChange('clients')}
+                    title="API Gateway"
+                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'clients' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                  >
+                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                      API Gateway
+                    </span>
+                  </button>
+                </li>
               </>
             )}
             
@@ -209,9 +224,11 @@ export default function App() {
             </svg>
           </button>
 
+          {/* 3. Updated Dynamic Header Title */}
           <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
             {activeTab === 'finance' ? 'Finance & Reconciliation' : 
              activeTab === 'payouts' ? 'B2C Payouts' : 
+             activeTab === 'clients' ? 'API Gateway' :
              `${activeTab} Dashboard`}
           </h2>
         </header>
@@ -223,9 +240,10 @@ export default function App() {
             <div className="p-4 md:p-8 h-full overflow-y-auto">
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
                 
-                {/* 3. STRICT WORKSPACE FALLBACK RENDERING */}
+                {/* 4. Added ClientManagement Route */}
                 {activeTab === 'payouts' && (isManagerOrAdmin ? <B2CPaymentForm /> : <UnauthorizedAccess />)}
                 {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
+                {activeTab === 'clients' && (isManagerOrAdmin ? <ClientManagement /> : <UnauthorizedAccess />)}
                 {activeTab === 'admin' && (isAdmin ? <AdminConsole /> : <UnauthorizedAccess />)}
                 {activeTab === 'viewer' && (isAdmin ? <AuditViewer token={user.token} /> : <UnauthorizedAccess />)}
                 
