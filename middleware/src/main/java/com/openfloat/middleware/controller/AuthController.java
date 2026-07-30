@@ -1,7 +1,5 @@
 package com.openfloat.middleware.controller;
 
-import com.openfloat.middleware.entity.SystemUser;
-import com.openfloat.middleware.repository.UserRepository;
 import com.openfloat.middleware.security.CustomUserDetailsService;
 import com.openfloat.middleware.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -28,17 +26,23 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(authRequest.username(), authRequest.password())
             );
         } catch (AuthenticationException e) {
-            // FIXED: This now catches wrong passwords AND users who are not Admins
-            return ResponseEntity.status(401).body("Access Denied: Incorrect credentials or not an Admin.");
+            // Updated error message since any valid user (Admin, Manager, Staff) can now log in
+            return ResponseEntity.status(401).body("Access Denied: Incorrect credentials.");
         }
 
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.username());
         final String jwt = jwtUtil.generateToken(userDetails);
+        
+        // Extract the user's actual role and strip the "ROLE_" prefix added by Spring Security
+        String role = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
 
-        return ResponseEntity.ok(new AuthResponse(jwt));
+        // Return BOTH the token and the dynamic role to React
+        return ResponseEntity.ok(new AuthResponse(jwt, role));
     }
 }
 
 // Data Transfer Objects
 record AuthRequest(String username, String password) {}
-record AuthResponse(String token) {}
+
+// UPDATED: Now requires a role to be sent to the frontend
+record AuthResponse(String token, String role) {}

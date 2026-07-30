@@ -22,20 +22,20 @@ export default function Login({ onSuccessfulLogin }) {
       });
 
       if (!response.ok) {
-        // If the backend sends 401 Unauthorized, throw an error to trigger the red box
         throw new Error('Authentication failed');
       }
 
-      // If successful, extract the real JWT token
+      // Extract the JWT token AND the dynamic role from the new backend response
       const data = await response.json();
 
-      // ---> THIS IS THE FIX: SAVE THE TOKEN TO THE BROWSER <---
+      // Save BOTH to the browser's local storage
       localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role); // Captures STAFF, MANAGER, or ADMIN
 
-      // Pass the real token to the main app layout
+      // Pass the real, dynamic data to the main app layout
       onSuccessfulLogin({
         username: username,
-        role: 'ADMIN', 
+        role: data.role, // No longer hardcoded
         token: data.token
       });
 

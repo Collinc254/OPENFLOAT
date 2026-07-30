@@ -25,4 +25,9 @@ public class SystemUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role; 
+
+    // NEW: Controls whether the user is active or disabled. Default is true.
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean enabled = true; 
 }

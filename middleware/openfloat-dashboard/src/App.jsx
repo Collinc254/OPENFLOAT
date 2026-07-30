@@ -7,7 +7,6 @@ import AuditViewer from './components/AuditViewer';
 import B2CPaymentForm from './components/B2CPaymentForm'; 
 
 export default function App() {
-  // 1. SMART INITIALIZATION: Check for existing session on page refresh
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('openfloat_user');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -18,18 +17,31 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    // 2. SAVE SESSION: Store user details in browser to survive refreshes
     localStorage.setItem('openfloat_user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
-    // 3. SECURE LOGOUT: Destroy session and tokens
     localStorage.removeItem('openfloat_user');
     localStorage.removeItem('token');
+    localStorage.removeItem('role'); // Clearing the role we added earlier
   };
 
+  // === ROLE-BASED ACCESS CONTROL (RBAC) LOGIC ===
+  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const isAdmin = user?.role === 'ADMIN';
+
   const handleTabChange = (tab) => {
+    // 1. STRICT STATE GUARD: Prevent unauthorized state changes
+    if ((tab === 'payouts' || tab === 'finance') && !isManagerOrAdmin) {
+      console.warn("Security Alert: Unauthorized access attempt blocked.");
+      return;
+    }
+    if ((tab === 'admin' || tab === 'viewer') && !isAdmin) {
+      console.warn("Security Alert: Unauthorized access attempt blocked.");
+      return;
+    }
+
     setActiveTab(tab);
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
@@ -40,13 +52,18 @@ export default function App() {
     return <Login onSuccessfulLogin={handleLoginSuccess} />;
   }
 
-  // === ROLE-BASED ACCESS CONTROL (RBAC) LOGIC ===
-  // Safely check the role from the logged-in user object
-  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
-  const isAdmin = user?.role === 'ADMIN';
+  // 2. FALLBACK COMPONENT: If a user breaks the state, show this instead of a blank screen
+  const UnauthorizedAccess = () => (
+    <div className="flex flex-col items-center justify-center h-full text-center px-4">
+      <div className="bg-red-50 p-6 rounded-full mb-4 border-8 border-red-100">
+        <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+      </div>
+      <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
+      <p className="text-slate-500 max-w-md">Your current role ({user.role}) does not have the required permissions to view this workspace.</p>
+    </div>
+  );
 
   return (
-    // STRICT 100VH LOCK: Changed min-h-screen to h-screen to prevent overall page scrolling
     <div className="h-screen w-full bg-slate-50 flex relative overflow-hidden">
       
       {/* MOBILE BACKDROP */}
@@ -57,14 +74,13 @@ export default function App() {
         />
       )}
 
-      {/* RESPONSIVE SIDEBAR: Height perfectly matches the main content */}
+      {/* RESPONSIVE SIDEBAR */}
       <aside className={`
         bg-slate-900 text-white flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden
         fixed md:relative h-full
         ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20 w-64'}
       `}>
         
-        {/* Portal Branding */}
         <div className={`p-6 border-b border-slate-800 flex items-center h-20 shrink-0 ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
           {isSidebarOpen ? (
             <div className="animate-in fade-in duration-300">
@@ -76,11 +92,10 @@ export default function App() {
           )}
         </div>
         
-        {/* Navigation Links */}
         <nav className="flex-1 py-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
           <ul className="space-y-2 px-3">
             
-            {/* TIER 1: STAFF (Visible to Everyone) */}
+            {/* TIER 1: STAFF */}
             <li>
               <button 
                 onClick={() => handleTabChange('operator')}
@@ -156,7 +171,6 @@ export default function App() {
           </ul>
         </nav>
 
-        {/* User Profile & Logout */}
         <div className={`p-4 border-t border-slate-800 bg-slate-950 shrink-0 transition-all ${isSidebarOpen ? '' : 'flex flex-col items-center'}`}>
           {isSidebarOpen ? (
             <div className="mb-4 animate-in fade-in duration-300">
@@ -183,14 +197,9 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Right Main Content Area */}
-      {/* 💥 FIX APPLIED HERE: Removed 'w-full' and enforced 'overflow-x-hidden' 💥 */}
       <main className="flex-1 flex flex-col h-screen overflow-x-hidden relative">
         
-        {/* Dynamic Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center shadow-sm z-10 h-20 shrink-0">
-          
-          {/* Toggle Hamburger Button */}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 mr-4 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
@@ -207,18 +216,19 @@ export default function App() {
           </h2>
         </header>
         
-        {/* SEAMLESS WORKSPACE */}
         <div className="flex-1 overflow-x-hidden bg-slate-50 relative flex flex-col h-full">
           {activeTab === 'operator' ? (
             <OperatorDashboard />
           ) : (
             <div className="p-4 md:p-8 h-full overflow-y-auto">
-              <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100">
-                {/* STRICT WORKSPACE RBAC RENDERING */}
-                {activeTab === 'payouts' && isManagerOrAdmin && <B2CPaymentForm />}
-                {activeTab === 'finance' && isManagerOrAdmin && <FinanceDashboard token={user.token} />}
-                {activeTab === 'admin' && isAdmin && <AdminConsole />}
-                {activeTab === 'viewer' && isAdmin && <AuditViewer token={user.token} />}
+              <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
+                
+                {/* 3. STRICT WORKSPACE FALLBACK RENDERING */}
+                {activeTab === 'payouts' && (isManagerOrAdmin ? <B2CPaymentForm /> : <UnauthorizedAccess />)}
+                {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
+                {activeTab === 'admin' && (isAdmin ? <AdminConsole /> : <UnauthorizedAccess />)}
+                {activeTab === 'viewer' && (isAdmin ? <AuditViewer token={user.token} /> : <UnauthorizedAccess />)}
+                
               </div>
             </div>
           )}
