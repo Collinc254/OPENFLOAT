@@ -6,6 +6,8 @@ import com.openfloat.middleware.dto.DarajaStkPushPayload;
 import com.openfloat.middleware.dto.DarajaStkPushResponse;
 import com.openfloat.middleware.dto.StkPushRequest;
 import com.openfloat.middleware.model.MpesaTransaction;
+import com.openfloat.middleware.model.WebhookPayload;
+import com.openfloat.middleware.repository.PaymentReferenceRepository;
 import com.openfloat.middleware.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,9 @@ public class StkPushService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final TransactionRepository transactionRepository;
     private final RabbitTemplate rabbitTemplate;
+    
+    // 1. INJECTED THE REFERENCE REPOSITORY
+    private final PaymentReferenceRepository referenceRepository;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         String token = getAccessToken();
@@ -104,11 +109,9 @@ public class StkPushService {
             return pushResponse;
             
         } catch (ResourceAccessException e) {
-            // Catches the 8-second timeout when Daraja Sandbox is down
             log.error("Safaricom Daraja API timed out: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "Safaricom API is currently unresponsive. Please try again later.");
         } catch (Exception e) {
-            // Fallback for bad payloads or other generic errors
             log.error("Daraja STK Push Failed: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to initiate STK Push with Safaricom.");
         }
@@ -169,8 +172,37 @@ public class StkPushService {
                         }
                     }
                     
-                    rabbitTemplate.convertAndSend("openfloat.erp.queue", trx);
-                    log.info("Message successfully published to CloudAMQP queue!");
+                    // 2. NEW MULTI-TENANT RABBITMQ ROUTING LOGIC
+                    String accountReference = trx.getId(); 
+                    final String finalReceipt = mpesaReceiptNumber;
+
+                    referenceRepository.findByReferenceCode(accountReference).ifPresentOrElse(reference -> {
+                        
+                        WebhookPayload payload = new WebhookPayload(
+                                reference.getReferenceCode(),
+                                reference.getClientSystem().getSystemName(),
+                                reference.getClientSystem().getWebhookUrl(),
+                                java.util.Map.of(
+                                        "amount", trx.getAmount(), 
+                                        "receiptNumber", finalReceipt, 
+                                        "phoneNumber", trx.getPhone(), 
+                                        "status", "COMPLETED"
+                                )
+                        );
+
+                        // Push to the exchange for external delivery
+                        rabbitTemplate.convertAndSend("openfloat.erp.exchange", "erp.payment.success", payload);
+
+                        reference.setStatus("COMPLETED");
+                        referenceRepository.save(reference);
+
+                        log.info("Successfully queued webhook delivery to {}", reference.getClientSystem().getSystemName());
+
+                    }, () -> {
+                        log.warn("Received successful payment but could not find matching API Gateway reference code: {}", accountReference);
+                        // Fallback to internal queue for manual review
+                        rabbitTemplate.convertAndSend("openfloat.erp.queue", trx);
+                    });
                     
                 } else {
                     log.warn("PAYMENT FAILED! Database updated. Reason: {}, Checkout ID: {}", resultDesc, checkoutRequestID);
@@ -193,13 +225,11 @@ public class StkPushService {
     private String getAccessToken() {
         HttpHeaders headers = new HttpHeaders();
         
-        // Fix 1 & 2: Trim invisible spaces from keys and add cache control
         headers.setBasicAuth(consumerKey.trim(), consumerSecret.trim()); 
         headers.add("Cache-Control", "no-cache");
         
         HttpEntity<String> request = new HttpEntity<>(headers);
 
-        // Fix 3: Guarantee the grant_type parameter exists
         String finalAuthUrl = authUrl.contains("grant_type") 
             ? authUrl 
             : authUrl + "?grant_type=client_credentials";
