@@ -1,6 +1,6 @@
 package com.openfloat.middleware.security;
 
-import com.openfloat.middleware.model.SystemUser;
+import com.openfloat.middleware.entity.SystemUser; // 💥 FIX: Updated to point to the entity package
 import com.openfloat.middleware.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -25,10 +25,12 @@ public class CustomUserDetailsService implements UserDetailsService {
         SystemUser systemUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // SECURE FIX: Format the database string strictly to Spring Security standards
-        String roleName = systemUser.getRole();
-        if (roleName != null && !roleName.startsWith("ROLE_")) {
-            roleName = "ROLE_" + roleName.toUpperCase();
+        // 💥 FIX: Since role is now an Enum, we use .name() to get its String value
+        String roleName = systemUser.getRole().name();
+        
+        // Format the database string strictly to Spring Security standards
+        if (!roleName.startsWith("ROLE_")) {
+            roleName = "ROLE_" + roleName;
         }
 
         // Convert our SystemUser into Spring Security's built-in User object with explicit Authority

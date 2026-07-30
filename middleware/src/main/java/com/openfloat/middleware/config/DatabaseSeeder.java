@@ -1,6 +1,7 @@
 package com.openfloat.middleware.config;
 
-import com.openfloat.middleware.model.SystemUser;
+import com.openfloat.middleware.entity.SystemUser;
+import com.openfloat.middleware.entity.Role;
 import com.openfloat.middleware.model.Tenant;
 import com.openfloat.middleware.repository.UserRepository;
 import com.openfloat.middleware.repository.TenantRepository;
@@ -47,7 +48,9 @@ public class DatabaseSeeder implements CommandLineRunner {
                     SystemUser admin = new SystemUser();
                     admin.setUsername(adminUsername.trim());
                     admin.setPassword(passwordEncoder.encode(adminPassword.trim()));
-                    admin.setRole("ADMIN");
+                    
+                    // 💥 FIX APPLIED HERE: Using the Role Enum instead of a String
+                    admin.setRole(Role.ADMIN);
 
                     userRepository.save(admin);
                     log.info("SUCCESS: Default Admin user created securely!");

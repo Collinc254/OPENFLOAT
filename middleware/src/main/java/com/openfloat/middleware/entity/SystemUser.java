@@ -1,13 +1,14 @@
-package com.openfloat.middleware.model;
+package com.openfloat.middleware.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
-@Table(name = "system_users")
+@Table(name = "system_users") 
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class SystemUser {
 
     @Id
@@ -20,6 +21,8 @@ public class SystemUser {
     @Column(nullable = false)
     private String password;
 
+    // Using the Enum instead of a String is much safer for enterprise RBAC
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String role; // This will store roles like "OPERATOR" or "ADMIN"
+    private Role role; 
 }

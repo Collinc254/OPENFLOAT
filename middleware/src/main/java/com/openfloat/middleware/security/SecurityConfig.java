@@ -8,6 +8,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -24,6 +25,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // 💥 FIX 1: Activates @PreAuthorize in our controllers
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -44,7 +46,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**", "/error").permitAll()
                 
                 // 2. PUBLIC: Safaricom Callbacks MUST bypass security
-                // FIXED: Explicitly whitelisted the actual Daraja callback URL
                 .requestMatchers(
                         "/api/v1/callbacks/**", 
                         "/api/v1/callback/**", 
@@ -53,16 +54,18 @@ public class SecurityConfig {
                         "/api/v1/b2c/timeout"
                 ).permitAll()
                 
-                // 3. ADMIN CONSOLE: Strict Admin lock
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                // 3. ADMIN CONSOLE & USER MANAGEMENT: Strict Admin lock
+                // 💥 FIX 2: Added /api/v1/users/** so the register endpoint is locked here as well
+                .requestMatchers("/api/v1/admin/**", "/api/v1/users/**").hasRole("ADMIN")
                 
-                // 4. PAYMENTS & TRANSACTIONS: Strict Operator and Admin lock
+                // 4. PAYMENTS & TRANSACTIONS: 
+                // 💥 FIX 3: Updated old roles to match the new Enum roles (STAFF, MANAGER, ADMIN)
                 .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
-                    .hasAnyRole("OPERATOR", "ADMIN")
+                    .hasAnyRole("STAFF", "MANAGER", "ADMIN")
                 
-                // 5. VIEWER & FINANCE
+                // 5. FINANCE
                 .requestMatchers("/api/v1/invoices/**")
-                    .hasAnyRole("VIEWER", "FINANCE", "OPERATOR", "ADMIN")
+                    .hasAnyRole("MANAGER", "ADMIN")
                 
                 // Everything else requires authentication
                 .anyRequest().authenticated()

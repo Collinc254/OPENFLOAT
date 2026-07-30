@@ -1,6 +1,6 @@
 package com.openfloat.middleware.controller;
 
-import com.openfloat.middleware.model.SystemUser;
+import com.openfloat.middleware.entity.SystemUser;
 import com.openfloat.middleware.repository.UserRepository;
 import com.openfloat.middleware.security.CustomUserDetailsService;
 import com.openfloat.middleware.security.JwtUtil;

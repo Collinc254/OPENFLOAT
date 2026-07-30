@@ -40,6 +40,11 @@ export default function App() {
     return <Login onSuccessfulLogin={handleLoginSuccess} />;
   }
 
+  // === ROLE-BASED ACCESS CONTROL (RBAC) LOGIC ===
+  // Safely check the role from the logged-in user object
+  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
     // STRICT 100VH LOCK: Changed min-h-screen to h-screen to prevent overall page scrolling
     <div className="h-screen w-full bg-slate-50 flex relative overflow-hidden">
@@ -74,6 +79,8 @@ export default function App() {
         {/* Navigation Links */}
         <nav className="flex-1 py-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
           <ul className="space-y-2 px-3">
+            
+            {/* TIER 1: STAFF (Visible to Everyone) */}
             <li>
               <button 
                 onClick={() => handleTabChange('operator')}
@@ -87,57 +94,65 @@ export default function App() {
               </button>
             </li>
 
-            <li>
-              <button 
-                onClick={() => handleTabChange('payouts')}
-                title="B2C Payouts"
-                className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-              >
-                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                  B2C Payouts
-                </span>
-              </button>
-            </li>
-
-            <li>
-              <button 
-                onClick={() => handleTabChange('finance')}
-                title="Finance & Recon"
-                className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-              >
-                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                  Finance & Recon
-                </span>
-              </button>
-            </li>
+            {/* TIER 2: MANAGERS & ADMINS */}
+            {isManagerOrAdmin && (
+              <>
+                <li>
+                  <button 
+                    onClick={() => handleTabChange('payouts')}
+                    title="B2C Payouts"
+                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                  >
+                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                      B2C Payouts
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => handleTabChange('finance')}
+                    title="Finance & Recon"
+                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                  >
+                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                      Finance & Recon
+                    </span>
+                  </button>
+                </li>
+              </>
+            )}
             
-            <li>
-              <button 
-                onClick={() => handleTabChange('admin')}
-                title="Admin Console"
-                className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'admin' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-              >
-                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                  Admin Console
-                </span>
-              </button>
-            </li>
-            
-            <li>
-              <button 
-                onClick={() => handleTabChange('viewer')}
-                title="Audit Viewer"
-                className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'viewer' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-              >
-                <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                  Audit Viewer
-                </span>
-              </button>
-            </li>
+            {/* TIER 3: ADMINS ONLY */}
+            {isAdmin && (
+              <>
+                <li>
+                  <button 
+                    onClick={() => handleTabChange('admin')}
+                    title="Admin Console"
+                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'admin' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                  >
+                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                      Admin Console
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => handleTabChange('viewer')}
+                    title="Audit Viewer"
+                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'viewer' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                  >
+                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                      Audit Viewer
+                    </span>
+                  </button>
+                </li>
+              </>
+            )}
           </ul>
         </nav>
 
@@ -192,19 +207,18 @@ export default function App() {
           </h2>
         </header>
         
-        {/* SEAMLESS WORKSPACE: Removed outer paddings and borders for the Operator tab */}
+        {/* SEAMLESS WORKSPACE */}
         <div className="flex-1 overflow-x-hidden bg-slate-50 relative flex flex-col h-full">
           {activeTab === 'operator' ? (
-            // Operator dashboard renders flush edge-to-edge with no scrolling
             <OperatorDashboard />
           ) : (
-            // Other tabs keep their padded containers to preserve their current designs
             <div className="p-4 md:p-8 h-full overflow-y-auto">
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100">
-                {activeTab === 'payouts' && <B2CPaymentForm />}
-                {activeTab === 'finance' && <FinanceDashboard token={user.token} />}
-                {activeTab === 'admin' && <AdminConsole />}
-                {activeTab === 'viewer' && <AuditViewer token={user.token} />}
+                {/* STRICT WORKSPACE RBAC RENDERING */}
+                {activeTab === 'payouts' && isManagerOrAdmin && <B2CPaymentForm />}
+                {activeTab === 'finance' && isManagerOrAdmin && <FinanceDashboard token={user.token} />}
+                {activeTab === 'admin' && isAdmin && <AdminConsole />}
+                {activeTab === 'viewer' && isAdmin && <AuditViewer token={user.token} />}
               </div>
             </div>
           )}
