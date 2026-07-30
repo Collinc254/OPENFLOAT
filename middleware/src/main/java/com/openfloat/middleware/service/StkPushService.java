@@ -200,8 +200,7 @@ public class StkPushService {
 
                     }, () -> {
                         log.warn("Received successful payment but could not find matching API Gateway reference code: {}", accountReference);
-                        // Fallback to internal queue for manual review
-                        rabbitTemplate.convertAndSend("openfloat.erp.queue", trx);
+                        // THE FIX: We no longer send the MpesaTransaction to the queue here.
                     });
                     
                 } else {
