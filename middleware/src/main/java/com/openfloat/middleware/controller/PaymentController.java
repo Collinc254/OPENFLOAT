@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
-@CrossOrigin(origins = "*") // 1. FIX: Allows Vercel frontend to read the backend response
+// THE FIX: Using originPatterns instead of origins to support credentialed requests (Authorization headers)
+@CrossOrigin(originPatterns = "*", allowCredentials = "true") 
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
@@ -30,7 +31,6 @@ public class PaymentController {
         return ResponseEntity.ok(transactionRepository.findAll());
     }
 
-    // 2. FIX: Mapped to both endpoints to prevent 404 mismatches with React
     @PostMapping(value = {"/trigger", "/stk-push"})
     public ResponseEntity<DarajaStkPushResponse> triggerStkPush(@RequestBody StkPushRequest request) {
         DarajaStkPushResponse response = stkPushService.sendPush(request);
@@ -44,7 +44,6 @@ public class PaymentController {
         return ResponseEntity.ok("{\"ResultCode\": 0, \"ResultDesc\": \"Accepted\"}");
     }
 
-    // 3. FIX: Added the missing status endpoint required by the React polling engine
     @GetMapping("/status/{checkoutRequestId}")
     public ResponseEntity<?> getTransactionStatus(@PathVariable String checkoutRequestId) {
         Optional<MpesaTransaction> transaction = transactionRepository.findByCheckoutRequestId(checkoutRequestId);
