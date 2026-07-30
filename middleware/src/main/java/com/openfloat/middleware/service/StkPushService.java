@@ -60,6 +60,15 @@ public class StkPushService {
     private final PaymentReferenceRepository referenceRepository;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
+        
+        // ==========================================
+        // NEW: PREVENT DUPLICATE REQUESTS (RACE CONDITIONS)
+        // ==========================================
+        if (transactionRepository.existsById(request.invoiceRef())) {
+            log.warn("Blocked duplicate STK Push request for Invoice Ref: {}", request.invoiceRef());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A transaction with this invoice reference is already processing.");
+        }
+
         String token = getAccessToken();
         String timestamp = generateTimestamp();
         String password = generatePassword(timestamp);

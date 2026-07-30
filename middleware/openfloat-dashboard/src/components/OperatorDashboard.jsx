@@ -21,8 +21,8 @@ export default function OperatorDashboard() {
   const [message, setMessage] = useState('');
   const [activeTxRef, setActiveTxRef] = useState(null);
 
-  // The synchronous submit lock
-  const submitLock = useRef(false);
+  // THE FIX: Explicit processing lock state
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // --- 1. INPUT VALIDATION & AUTO-FORMATTING ---
   const handlePhoneChange = (e) => {
@@ -119,14 +119,14 @@ export default function OperatorDashboard() {
               setStatus('success');
               setMessage(`Success ${data.receiptNumber}`); 
               setActiveTxRef(null);
-              submitLock.current = false; 
+              setIsProcessing(false); // RELEASE LOCK
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
               setMessage('Failed');
               setActiveTxRef(null);
-              submitLock.current = false; 
+              setIsProcessing(false); // RELEASE LOCK
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
@@ -137,7 +137,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
-        submitLock.current = false; 
+        setIsProcessing(false); // RELEASE LOCK
       }, 90000);
     }
 
@@ -151,23 +151,21 @@ export default function OperatorDashboard() {
   const handleExecute = async (e) => {
     e.preventDefault();
 
-    if (submitLock.current) return;
-    submitLock.current = true;
-
+    // 1. HARD LOCK TO PREVENT DOUBLE CLICKS
+    if (isProcessing) return;
+    
     if (processingMode === 'single') {
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length !== 12) {
         setPhoneError('Number must be exactly 12 digits');
-        submitLock.current = false; 
         return;
       }
     }
 
-    if (phoneError) {
-      submitLock.current = false; 
-      return; 
-    }
-    
+    if (phoneError) return; 
+
+    // 2. ENGAGE LOCK & SET UI STATE
+    setIsProcessing(true);
     setStatus('loading');
     setMessage('');
 
@@ -202,6 +200,7 @@ export default function OperatorDashboard() {
         const responseData = await response.json();
         const checkoutId = responseData.CheckoutRequestID || responseData.checkoutRequestID || responseData.checkoutRequestId;
 
+        // Transition to polling, keep isProcessing TRUE
         setStatus('polling');
         setActiveTxRef(checkoutId); 
         setMessage('Awaiting customer PIN entry...'); 
@@ -209,16 +208,14 @@ export default function OperatorDashboard() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         setStatus('success');
         setMessage(`Batch ${transactionType} queued successfully. Processing ${batchData.length} records.`);
+        setIsProcessing(false); // Release for batch immediately
       }
       
     } catch (error) {
       console.error('Payment Error:', error);
       setStatus('error');
       setMessage('Network error. Unable to reach the OpenFloat servers.');
-    } finally {
-      if (processingMode !== 'single' || status === 'error') {
-        submitLock.current = false;
-      }
+      setIsProcessing(false); // Release lock on network crash
     }
   };
 
@@ -259,7 +256,7 @@ export default function OperatorDashboard() {
                 <select
                   value={transactionType}
                   onChange={(e) => setTransactionType(e.target.value)}
-                  disabled={status === 'polling' || status === 'loading'}
+                  disabled={isProcessing}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors outline-none text-slate-700 text-sm font-medium appearance-none disabled:opacity-50"
                 >
                   {processingMode === 'single' && <option value="STK Push">C2B STK Push (Collection)</option>}
@@ -282,7 +279,7 @@ export default function OperatorDashboard() {
                     type="text" 
                     value={phone}
                     onChange={handlePhoneChange}
-                    disabled={status === 'polling' || status === 'loading'}
+                    disabled={isProcessing}
                     className={`w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:outline-none text-slate-700 font-mono tracking-wide disabled:opacity-50 transition-colors
                       ${phoneError ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-slate-200 focus:ring-green-500 focus:border-green-500'}`}
                     required
@@ -300,7 +297,7 @@ export default function OperatorDashboard() {
                     type="number" 
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    disabled={status === 'polling' || status === 'loading'}
+                    disabled={isProcessing}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-slate-700 font-medium text-sm disabled:opacity-50"
                     min="1"
                     required
@@ -337,7 +334,7 @@ export default function OperatorDashboard() {
                       </div>
                       <div className="text-right">
                         <h3 className="font-bold text-sm text-slate-800">KES {batchTotal.toLocaleString()}</h3>
-                        <button type="button" onClick={clearBatch} className="text-[10px] text-red-500 hover:text-red-700 font-semibold mt-0.5">Remove File</button>
+                        <button type="button" onClick={clearBatch} disabled={isProcessing} className="text-[10px] text-red-500 hover:text-red-700 font-semibold mt-0.5 disabled:opacity-50">Remove File</button>
                       </div>
                     </div>
                     
@@ -361,20 +358,20 @@ export default function OperatorDashboard() {
 
             <button 
               type="submit" 
-              disabled={status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
+              disabled={isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
               className={`w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all flex justify-center items-center gap-2 mt-2
-                ${status === 'loading' || status === 'polling' || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
+                ${isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
                   ? 'bg-slate-300 cursor-not-allowed' 
                   : 'bg-green-600 hover:bg-green-700 shadow-sm hover:shadow'}`}
             >
                {status === 'loading' && 'Initiating...'}
                {status === 'polling' && (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Awaiting PIN...
-                  </>
+                 <>
+                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                   Awaiting PIN...
+                 </>
                )}
-               {status !== 'loading' && status !== 'polling' && `Execute ${processingMode === 'batch' ? 'Batch ' : ''}${transactionType.split(' ')[0]}`}
+               {!isProcessing && `Execute ${processingMode === 'batch' ? 'Batch ' : ''}${transactionType.split(' ')[0]}`}
             </button>
           </form>
 
