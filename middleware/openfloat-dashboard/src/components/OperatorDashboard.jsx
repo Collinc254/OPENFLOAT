@@ -113,18 +113,19 @@ export default function OperatorDashboard() {
             return res.json();
           })
           .then((data) => {
-            if (data.status === 'SUCCESS') {
+            // THE FIX: Accept SUCCESS, PAID, or COMPLETED variations from backend
+            if (data.status === 'SUCCESS' || data.status === 'PAID' || data.status === 'COMPLETED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('success');
-              setMessage(`Success ${data.receiptNumber}`); 
+              setMessage(`Payment Successful! Receipt: ${data.receiptNumber}`); 
               setActiveTxRef(null);
               setIsProcessing(false); // RELEASE LOCK
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
-              setMessage('Failed');
+              setMessage('Payment Failed.');
               setActiveTxRef(null);
               setIsProcessing(false); // RELEASE LOCK
             }
