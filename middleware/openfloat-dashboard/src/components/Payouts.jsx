@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const B2CPaymentForm = () => {
+const Payouts = () => {
     // Defaulting to Safaricom's universal sandbox test number to prevent 2040 errors
     const [phoneNumber, setPhoneNumber] = useState('254708374149'); 
     const [amount, setAmount] = useState('10');
@@ -29,7 +29,7 @@ const B2CPaymentForm = () => {
             if (data.ResponseCode === "0") {
                 setStatusMessage(`Success! Payment queued. Tracking ID: ${data.ConversationID}`);
             } else {
-                setStatusMessage(`Failed: Safaricom rejected the request. Check Render logs.`);
+                setStatusMessage('Payment failed');
             }
         } catch (error) {
             console.error("Payment Error:", error);
@@ -41,7 +41,7 @@ const B2CPaymentForm = () => {
 
     return (
         <div className="max-w-xl">
-            <h3 className="text-lg font-semibold text-slate-800 mb-6">Initiate B2C Payout</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-6">Initiate Payout</h3>
             
             <form onSubmit={handlePayment} className="space-y-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <div>
@@ -90,4 +90,4 @@ const B2CPaymentForm = () => {
     );
 };
 
-export default B2CPaymentForm;
+export default Payouts;
