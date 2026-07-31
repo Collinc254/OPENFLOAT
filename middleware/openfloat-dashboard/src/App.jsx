@@ -4,7 +4,7 @@ import OperatorDashboard from './components/OperatorDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
-import B2CPaymentForm from './components/B2CPaymentForm'; 
+import Payouts from './components/Payouts'; 
 import ClientManagement from './components/ClientManagement'; // 1. Added Import
 
 export default function App() {
@@ -241,7 +241,7 @@ export default function App() {
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
                 
                 {/* 4. Added ClientManagement Route */}
-                {activeTab === 'payouts' && (isManagerOrAdmin ? <B2CPaymentForm /> : <UnauthorizedAccess />)}
+                {activeTab === 'payouts' && (isManagerOrAdmin ? <Payouts /> : <UnauthorizedAccess />)}
                 {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
                 {activeTab === 'clients' && (isManagerOrAdmin ? <ClientManagement /> : <UnauthorizedAccess />)}
                 {activeTab === 'admin' && (isAdmin ? <AdminConsole /> : <UnauthorizedAccess />)}
