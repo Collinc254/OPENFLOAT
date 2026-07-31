@@ -5,9 +5,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Column;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "audit_logs")
@@ -16,6 +18,10 @@ public class AuditLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // A unique identifier for the specific event, critical for SIEM trails
+    @Column(updatable = false, unique = true)
+    private String eventId;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime timestamp;
@@ -28,15 +34,19 @@ public class AuditLog {
     public AuditLog() {}
 
     public AuditLog(String actor, String action, String targetComponent, String status) {
+        this.eventId = UUID.randomUUID().toString();
         this.actor = actor;
         this.action = action;
         this.targetComponent = targetComponent;
         this.status = status;
-        this.timestamp = LocalDateTime.now(); // Automatically stamps the exact time of the event
+        this.timestamp = LocalDateTime.now(); 
     }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getEventId() { return eventId; }
+    public void setEventId(String eventId) { this.eventId = eventId; }
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }

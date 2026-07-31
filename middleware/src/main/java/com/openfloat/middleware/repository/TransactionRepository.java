@@ -16,4 +16,7 @@ public interface TransactionRepository extends JpaRepository<MpesaTransaction, S
 
     // Find a transaction using Safaricom's Checkout Request ID
     Optional<MpesaTransaction> findByCheckoutRequestId(String checkoutRequestId);
+
+    // NEW: Required for the 3-Way Reconciliation Engine to cross-reference CSVs
+    Optional<MpesaTransaction> findByMpesaRef(String mpesaRef);
 }

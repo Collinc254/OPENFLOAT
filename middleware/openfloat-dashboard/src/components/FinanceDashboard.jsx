@@ -1,9 +1,21 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 export default function FinanceDashboard({ token }) {
   // View state
-  const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' or 'reports'
+  const [activeTab, setActiveTab] = useState('transactions'); 
   const [showFilters, setShowFilters] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Resolution Modal State (Feature 7)
+  const [resolvingTx, setResolvingTx] = useState(null);
+  const [resolveNote, setResolveNote] = useState('');
+  const [resolveSystem, setResolveSystem] = useState('');
+
+  // 3-Way Audit State (Feature 8)
+  const [auditFile, setAuditFile] = useState(null);
+  const [auditResults, setAuditResults] = useState(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Data state
   const [transactions, setTransactions] = useState([]);
@@ -12,13 +24,7 @@ export default function FinanceDashboard({ token }) {
 
   // Filter state
   const [filters, setFilters] = useState({
-    date: '',
-    clientSystem: '',
-    amount: '',
-    phone: '',
-    status: '',
-    provider: '',
-    reference: ''
+    date: '', clientSystem: '', amount: '', phone: '', status: '', provider: '', reference: ''
   });
 
   // --- TIME PRESET HELPERS ---
@@ -26,7 +32,6 @@ export default function FinanceDashboard({ token }) {
     const d = new Date();
     if (days > 0) d.setDate(d.getDate() - days);
     const dateString = d.toISOString().split('T')[0];
-    
     const newFilters = { ...filters, date: dateString };
     setFilters(newFilters);
     fetchTransactions(newFilters);
@@ -58,13 +63,9 @@ export default function FinanceDashboard({ token }) {
       const params = new URLSearchParams();
 
       if (activeFilters) {
-        if (activeFilters.date) params.append('date', activeFilters.date);
-        if (activeFilters.clientSystem) params.append('clientSystem', activeFilters.clientSystem);
-        if (activeFilters.amount) params.append('amount', activeFilters.amount);
-        if (activeFilters.phone) params.append('phone', activeFilters.phone);
-        if (activeFilters.status) params.append('status', activeFilters.status);
-        if (activeFilters.provider) params.append('provider', activeFilters.provider);
-        if (activeFilters.reference) params.append('reference', activeFilters.reference);
+        Object.keys(activeFilters).forEach(key => {
+          if (activeFilters[key]) params.append(key, activeFilters[key]);
+        });
       }
 
       const queryString = params.toString();
@@ -74,10 +75,7 @@ export default function FinanceDashboard({ token }) {
       
       const response = await fetch(endpoint, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       
       if (!response.ok) throw new Error(`Server returned ${response.status}. Failed to fetch data.`);
@@ -92,7 +90,8 @@ export default function FinanceDashboard({ token }) {
         type: tx.type || tx.transactionType || 'STK Push',
         status: tx.status || 'PENDING',
         date: tx.date || tx.createdAt || tx.timestamp || 'Just now',
-        clientSystem: tx.clientSystem || tx.clientSystemName || 'API Gateway'
+        clientSystem: tx.clientSystem || tx.clientSystemName || 'API Gateway',
+        reconciliationStatus: tx.reconciliationStatus || ((tx.clientSystem === 'UNKNOWN' || !tx.clientSystem) ? 'UNMATCHED' : 'MATCHED')
       }));
       
       formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -111,169 +110,243 @@ export default function FinanceDashboard({ token }) {
   }, [token]);
 
 
-  // --- ANALYTICS ENGINE (Calculates automatically when transactions change) ---
+  // --- FEATURE 7: MANUAL RESOLUTION API ---
+  const handleSubmitResolution = async () => {
+    if (!resolveSystem || !resolveNote) {
+      alert("Please select a target system and provide a reconciliation note.");
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      const response = await fetch(`${API_URL}/api/v1/payments/resolve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: resolvingTx.id,
+          system: resolveSystem,
+          note: resolveNote
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to resolve transaction.");
+      }
+      
+      // Close modal, clear state, and refresh grid
+      setResolvingTx(null);
+      setResolveSystem('');
+      setResolveNote('');
+      fetchTransactions(filters); 
+      
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  // --- FEATURE 8: 3-WAY AUDIT API ---
+  const handleRunAudit = async () => {
+    if (!auditFile) {
+      alert("Please upload a Safaricom Provider CSV first.");
+      return;
+    }
+
+    setAuditLoading(true);
+    setAuditResults(null);
+
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      
+      const formData = new FormData();
+      formData.append('providerFile', auditFile);
+
+      const response = await fetch(`${API_URL}/api/v1/reconciliation/audit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Fetch automatically sets the correct multipart boundary
+        },
+        body: formData
+      });
+
+      if (!response.ok) throw new Error("Audit Engine failed to process the file.");
+      
+      const reportData = await response.json();
+      setAuditResults(reportData);
+      
+    } catch (err) {
+      alert(`Audit Error: ${err.message}`);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+
+  // --- CSV EXPORT ENGINE ---
+  const downloadCSV = (exportType) => {
+    let dataToExport = transactions;
+    if (exportType === 'FAILED') dataToExport = transactions.filter(tx => tx.status === 'FAILED');
+    if (exportType === 'PENDING') dataToExport = transactions.filter(tx => tx.status === 'PENDING');
+    if (exportType === 'SUCCESS') dataToExport = transactions.filter(tx => ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status));
+    if (exportType === 'UNMATCHED') dataToExport = transactions.filter(tx => tx.reconciliationStatus === 'UNMATCHED');
+
+    if (dataToExport.length === 0) {
+      alert(`No records found for export type: ${exportType}`);
+      return;
+    }
+
+    const headers = ['Date', 'System ID', 'M-Pesa Ref', 'Phone', 'Amount', 'Status', 'Reconciliation Status'];
+    const csvRows = [headers.join(',')];
+
+    dataToExport.forEach(tx => {
+      const row = [tx.date, tx.id, tx.mpesaRef, tx.phone, tx.amount, tx.status, tx.reconciliationStatus];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `openfloat_${exportType.toLowerCase()}_report.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setShowExportMenu(false);
+  };
+
+  // --- ANALYTICS ENGINE ---
   const report = useMemo(() => {
-    let totalRevenue = 0;
-    let successCount = 0;
-    let failedCount = 0;
+    let totalRevenue = 0; let successCount = 0; let failedCount = 0;
     const systems = {};
 
     transactions.forEach(tx => {
       const isSuccess = ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status);
-      const isFail = tx.status === 'FAILED';
       const sys = tx.clientSystem;
 
-      // Initialize system in the map if it doesn't exist
-      if (!systems[sys]) {
-        systems[sys] = { name: sys, total: 0, revenue: 0, success: 0, failed: 0 };
-      }
-
+      if (!systems[sys]) systems[sys] = { name: sys, total: 0, revenue: 0, success: 0, failed: 0 };
       systems[sys].total++;
 
       if (isSuccess) {
-        successCount++;
-        totalRevenue += Number(tx.amount);
-        systems[sys].success++;
-        systems[sys].revenue += Number(tx.amount);
-      } else if (isFail) {
-        failedCount++;
-        systems[sys].failed++;
+        successCount++; totalRevenue += Number(tx.amount);
+        systems[sys].success++; systems[sys].revenue += Number(tx.amount);
+      } else if (tx.status === 'FAILED') {
+        failedCount++; systems[sys].failed++;
       }
     });
 
-    const totalCount = transactions.length;
-    const successRate = totalCount > 0 ? ((successCount / totalCount) * 100).toFixed(1) : 0;
-
     return {
-      totalRevenue,
-      successCount,
-      failedCount,
-      totalCount,
-      successRate,
-      systemBreakdown: Object.values(systems).sort((a, b) => b.revenue - a.revenue) // Sort systems by revenue
+      totalRevenue, successCount, failedCount, totalCount: transactions.length,
+      successRate: transactions.length > 0 ? ((successCount / transactions.length) * 100).toFixed(1) : 0,
+      systemBreakdown: Object.values(systems).sort((a, b) => b.revenue - a.revenue)
     };
   }, [transactions]);
 
+  const unmatchedTransactions = transactions.filter(tx => tx.reconciliationStatus === 'UNMATCHED');
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
       
       {/* Header Section */}
-      <div className="bg-slate-900 px-6 py-5 flex justify-between items-center">
+      <div className="bg-slate-900 px-6 py-5 flex justify-between items-center relative flex-shrink-0">
         <div>
           <h2 className="text-xl font-bold text-white tracking-wide">Reconciliation Engine</h2>
-          <p className="text-slate-400 text-sm mt-1">Live M-Pesa Callback Logs & Analytics</p>
+          <p className="text-slate-400 text-sm mt-1">Live Logs, Exceptions & 3-Way Audit</p>
         </div>
         <div className="flex gap-3">
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded border text-sm font-medium transition-colors ${showFilters ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700'}`}
-          >
+          <button onClick={() => setShowFilters(!showFilters)} className={`px-4 py-2 rounded border text-sm font-medium transition-colors ${showFilters ? 'bg-green-600 text-white border-green-600' : 'bg-slate-800 text-white border-slate-700'}`}>
             {showFilters ? 'Hide Filters' : 'Filter Records'}
           </button>
-          <button className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded border border-slate-700 text-sm font-medium transition-colors">
-            Export CSV
-          </button>
+          
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(!showExportMenu)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded border border-slate-700 text-sm font-medium transition-colors flex items-center gap-2">
+              Export CSV ▼
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
+                <button onClick={() => downloadCSV('ALL')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export All Records</button>
+                <button onClick={() => downloadCSV('SUCCESS')} className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-slate-100">Export Successful</button>
+                <button onClick={() => downloadCSV('FAILED')} className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-slate-100">Export Failed</button>
+                <button onClick={() => downloadCSV('PENDING')} className="w-full text-left px-4 py-2 text-sm text-yellow-700 hover:bg-slate-100">Export Pending</button>
+                <button onClick={() => downloadCSV('UNMATCHED')} className="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-slate-100">Export Exceptions</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Filter Drawer Section */}
+      {/* Filter Drawer */}
       {showFilters && (
-        <div className="bg-slate-50 p-5 border-b border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
-          
-          {/* Quick Time Presets */}
-          <div className="mb-4 flex gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase flex items-center mr-2">Quick Summaries:</span>
-            <button onClick={() => applyTimePreset(0)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:border-green-500 hover:text-green-600 transition-colors">Daily (Today)</button>
-            <button onClick={() => applyTimePreset(7)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:border-green-500 hover:text-green-600 transition-colors">Weekly</button>
-            <button onClick={() => applyTimePreset(30)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:border-green-500 hover:text-green-600 transition-colors">Monthly</button>
-          </div>
-
-          <form onSubmit={handleApplyFilters}>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Specific Date</label>
-                <input type="date" name="date" value={filters.date} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Account Reference</label>
-                <input type="text" name="reference" placeholder="e.g. INV-1234" value={filters.reference} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
-                <input type="text" name="phone" placeholder="2547..." value={filters.phone} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-                <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none transition-colors">
-                  <option value="">All Statuses</option>
-                  <option value="SUCCESS">Success / Paid</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="FAILED">Failed</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Client System</label>
-                <input type="text" name="clientSystem" placeholder="e.g. ERP, POS" value={filters.clientSystem} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none transition-colors" />
-              </div>
-            </div>
-            
-            <div className="mt-5 flex justify-end gap-3">
-              <button type="button" onClick={clearFilters} className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-100 transition-colors">Clear All</button>
-              <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-bold text-white bg-green-600 rounded hover:bg-green-700 transition-colors disabled:opacity-70 flex items-center gap-2">
-                {loading ? 'Searching...' : 'Apply Filters'}
-              </button>
-            </div>
-          </form>
-        </div>
+         <div className="bg-slate-50 p-5 border-b border-slate-200 flex-shrink-0">
+           <form onSubmit={handleApplyFilters}>
+             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+               <div><label className="block text-xs font-semibold text-slate-700 mb-1">Date</label><input type="date" name="date" value={filters.date} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+               <div><label className="block text-xs font-semibold text-slate-700 mb-1">Account Reference</label><input type="text" name="reference" value={filters.reference} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+               <div><label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label><input type="text" name="phone" value={filters.phone} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+               <div><label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                 <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                   <option value="">All Statuses</option><option value="SUCCESS">Success / Paid</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option>
+                 </select>
+               </div>
+             </div>
+             <div className="mt-5 flex justify-end gap-3">
+               <button type="button" onClick={clearFilters} className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-100">Clear All</button>
+               <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-bold text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-70">Apply Filters</button>
+             </div>
+           </form>
+         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 px-6">
-        <button 
-          onClick={() => setActiveTab('transactions')}
-          className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'transactions' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-        >
-          Transaction Grid
+      {/* Main Navigation Tabs */}
+      <div className="flex border-b border-slate-200 px-6 bg-slate-50 flex-shrink-0">
+        <button onClick={() => setActiveTab('transactions')} className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'transactions' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500'}`}>Transaction Grid</button>
+        <button onClick={() => setActiveTab('reports')} className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'reports' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500'}`}>Payment Summary</button>
+        <button onClick={() => setActiveTab('exceptions')} className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'exceptions' ? 'border-red-600 text-red-700' : 'border-transparent text-slate-500'}`}>
+          Unknown References {unmatchedTransactions.length > 0 && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{unmatchedTransactions.length}</span>}
         </button>
-        <button 
-          onClick={() => setActiveTab('reports')}
-          className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'reports' ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-        >
-          System Payment Summary
-        </button>
+        <button onClick={() => setActiveTab('audit')} className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'audit' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>3-Way Audit</button>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium">Error: {error}</div>}
+      {error && <div className="bg-red-50 text-red-700 p-4 text-sm font-medium flex-shrink-0">Error: {error}</div>}
 
-      {/* TAB CONTENT: System Payment Summary */}
-      {activeTab === 'reports' && (
-        <div className="p-6 bg-slate-50 min-h-[400px]">
-          
-          {/* Top Level KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-green-500">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Revenue</p>
-              <h3 className="text-2xl font-black text-slate-800">KES {report.totalRevenue.toLocaleString()}</h3>
-            </div>
-            <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Callback Success Rate</p>
-              <h3 className="text-2xl font-black text-slate-800">{report.successRate}%</h3>
-            </div>
-            <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Successful Payments</p>
-              <h3 className="text-2xl font-black text-slate-800">{report.successCount} <span className="text-sm font-medium text-slate-400">/ {report.totalCount}</span></h3>
-            </div>
-            <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-red-500">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Failed Payments</p>
-              <h3 className="text-2xl font-black text-slate-800">{report.failedCount}</h3>
-            </div>
-          </div>
+      <div className="flex-1 overflow-y-auto">
+        
+        {/* TAB 1: TRANSACTION GRID */}
+        {activeTab === 'transactions' && (
+           <table className="w-full text-left border-collapse">
+             <thead>
+               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
+                 <th className="px-6 py-4 font-semibold">Date</th>
+                 <th className="px-6 py-4 font-semibold">System / Ref</th>
+                 <th className="px-6 py-4 font-semibold">M-Pesa Receipt</th>
+                 <th className="px-6 py-4 font-semibold">Amount</th>
+                 <th className="px-6 py-4 font-semibold">Status</th>
+               </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+               {transactions.map((tx, idx) => (
+                 <tr key={idx} className="hover:bg-slate-50">
+                   <td className="px-6 py-4 whitespace-nowrap">{tx.date}</td>
+                   <td className="px-6 py-4 font-mono text-xs">{tx.clientSystem}<br/><span className="text-slate-400">{tx.id}</span></td>
+                   <td className="px-6 py-4 font-mono font-medium">{tx.mpesaRef}</td>
+                   <td className="px-6 py-4 font-semibold">KES {tx.amount}</td>
+                   <td className="px-6 py-4"><span className="px-2 py-1 rounded text-xs font-bold bg-slate-100">{tx.status}</span></td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+        )}
 
-          {/* Client System Breakdown Table */}
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Revenue by Client System</h3>
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse">
+        {/* TAB 2: SYSTEM SUMMARY */}
+        {activeTab === 'reports' && (
+          <div className="p-6">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Total Revenue: KES {report.totalRevenue.toLocaleString()}</h3>
+             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
                   <th className="px-6 py-3 font-semibold">Client System</th>
@@ -284,10 +357,7 @@ export default function FinanceDashboard({ token }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {report.systemBreakdown.length === 0 ? (
-                  <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">No system data available for these filters.</td></tr>
-                ) : (
-                  report.systemBreakdown.map((sys, idx) => (
+                {report.systemBreakdown.map((sys, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="px-6 py-4 font-bold text-slate-800">{sys.name}</td>
                       <td className="px-6 py-4 font-semibold text-green-700">KES {sys.revenue.toLocaleString()}</td>
@@ -295,68 +365,150 @@ export default function FinanceDashboard({ token }) {
                       <td className="px-6 py-4 font-medium text-green-600 text-center">{sys.success}</td>
                       <td className="px-6 py-4 font-medium text-red-500 text-center">{sys.failed}</td>
                     </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* TAB 3: UNMATCHED EXCEPTIONS */}
+        {activeTab === 'exceptions' && (
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-800">Suspense Account / Unknown References</h3>
+              <p className="text-sm text-slate-500">Payments received but not tied to a valid client system.</p>
+            </div>
+            
+            <table className="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 font-semibold">Date</th>
+                  <th className="px-6 py-3 font-semibold">Receipt</th>
+                  <th className="px-6 py-3 font-semibold">Phone</th>
+                  <th className="px-6 py-3 font-semibold">Amount</th>
+                  <th className="px-6 py-3 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-sm">
+                {unmatchedTransactions.length === 0 ? (
+                  <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">No unmatched transactions found.</td></tr>
+                ) : (
+                  unmatchedTransactions.map((tx, idx) => (
+                    <tr key={idx} className="bg-red-50 hover:bg-red-100 transition-colors">
+                      <td className="px-6 py-4">{tx.date}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-slate-800">{tx.mpesaRef}</td>
+                      <td className="px-6 py-4">{tx.phone}</td>
+                      <td className="px-6 py-4 font-bold text-red-700">KES {tx.amount}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => setResolvingTx(tx)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50">
+                          Resolve Manual
+                        </button>
+                      </td>
+                    </tr>
                   ))
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
 
-      {/* TAB CONTENT: Transaction Grid */}
-      {activeTab === 'transactions' && (
-        <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-semibold">Date / Time</th>
-                <th className="px-6 py-4 font-semibold">System ID</th>
-                <th className="px-6 py-4 font-semibold">M-Pesa Ref</th>
-                <th className="px-6 py-4 font-semibold">MSISDN</th>
-                <th className="px-6 py-4 font-semibold">Type</th>
-                <th className="px-6 py-4 font-semibold">Amount</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
-                    <svg className="animate-spin h-6 w-6 text-slate-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Fetching records...
-                  </td>
-                </tr>
-              ) : transactions.length === 0 && !error ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
-                    No transactions match the selected filters.
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((tx, index) => (
-                  <tr key={tx.id || index} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">{tx.date}</td>
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-slate-600">{tx.clientSystem} <span className="text-[10px] font-normal text-slate-400 block">{tx.id}</span></td>
-                    <td className="px-6 py-4 font-mono font-medium text-slate-900">{tx.mpesaRef}</td>
-                    <td className="px-6 py-4">{tx.phone}</td>
-                    <td className="px-6 py-4">{tx.type}</td>
-                    <td className="px-6 py-4 font-semibold">KES {tx.amount.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold
-                        ${tx.status === 'PAID' || tx.status === 'SUCCESS' || tx.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : ''}
-                        ${tx.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : ''}
-                        ${tx.status === 'FAILED' ? 'bg-red-100 text-red-800' : ''}
-                      `}>
-                        {tx.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+            {/* Resolution Modal */}
+            {resolvingTx && (
+              <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Resolve Transaction</h3>
+                  <p className="text-sm text-slate-500 mb-4 font-mono">Receipt: {resolvingTx.mpesaRef}</p>
+                  
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Assign to Client System</label>
+                  <select value={resolveSystem} onChange={(e) => setResolveSystem(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded mb-4 text-sm">
+                    <option value="">Select Target System...</option>
+                    <option value="ERP_CORE">ERP Core System</option>
+                    <option value="POS_TERMINAL_1">POS Terminal 1</option>
+                  </select>
+
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Reconciliation Notes</label>
+                  <textarea value={resolveNote} onChange={(e) => setResolveNote(e.target.value)} placeholder="Audit justification..." className="w-full px-3 py-2 border border-slate-300 rounded mb-4 text-sm h-24"></textarea>
+
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setResolvingTx(null)} className="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 rounded hover:bg-slate-200">Cancel</button>
+                    <button onClick={handleSubmitResolution} className="px-4 py-2 text-sm font-bold text-white bg-green-600 rounded hover:bg-green-700">Submit Resolution</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: 3-WAY AUDIT ENGINE */}
+        {activeTab === 'audit' && (
+          <div className="p-6">
+            <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Initialize 3-Way Reconciliation</h3>
+              <p className="text-sm text-slate-500 mb-6">Compare Provider Statements (Safaricom) against the OpenFloat Database and Client System confirmations to detect missing, duplicate, or mismatched amounts.</p>
+              
+              <div className="space-y-4">
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${auditFile ? 'border-green-400 bg-green-50' : 'border-slate-300 hover:bg-slate-50'}`}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <p className="text-sm font-bold text-slate-700">
+                    {auditFile ? `Selected: ${auditFile.name}` : '1. Upload Provider CSV (Safaricom)'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">Select the raw statement from the provider portal.</p>
+                  <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={(e) => setAuditFile(e.target.files[0])} />
+                </div>
+              </div>
+
+              <button 
+                onClick={handleRunAudit} 
+                disabled={auditLoading || !auditFile}
+                className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors flex justify-center items-center gap-2"
+              >
+                {auditLoading ? 'Processing Statement...' : 'Run Audit Engine'}
+              </button>
+
+              {/* AUDIT RESULTS RENDER */}
+              {auditResults && (
+                <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex gap-4 mb-6">
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                       <p className="text-xs font-bold text-slate-500 uppercase">Records Checked</p>
+                       <p className="text-2xl font-black text-slate-800">{auditResults.totalProcessed}</p>
+                    </div>
+                    <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                       <p className="text-xs font-bold text-green-700 uppercase">Perfect Matches</p>
+                       <p className="text-2xl font-black text-green-800">{auditResults.successfulMatches}</p>
+                    </div>
+                  </div>
+
+                  {auditResults.missingInDatabase.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-bold text-red-700 mb-2">Missing in OpenFloat ({auditResults.missingInDatabase.length})</h4>
+                      <ul className="text-xs font-mono text-slate-600 bg-slate-50 p-3 rounded border border-slate-200 max-h-40 overflow-y-auto">
+                        {auditResults.missingInDatabase.map((err, i) => <li key={i} className="py-1 border-b border-slate-100 last:border-0">{err}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {auditResults.mismatchedAmounts.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-bold text-orange-700 mb-2">Amount Mismatches ({auditResults.mismatchedAmounts.length})</h4>
+                      <ul className="text-xs font-mono text-slate-600 bg-slate-50 p-3 rounded border border-slate-200 max-h-40 overflow-y-auto">
+                        {auditResults.mismatchedAmounts.map((err, i) => <li key={i} className="py-1 border-b border-slate-100 last:border-0">{err}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {auditResults.missingInDatabase.length === 0 && auditResults.mismatchedAmounts.length === 0 && (
+                     <div className="bg-green-100 text-green-800 p-4 rounded-lg text-center font-bold text-sm">
+                       ✅ Audit Passed: 100% Reconciliation Accuracy.
+                     </div>
+                  )}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

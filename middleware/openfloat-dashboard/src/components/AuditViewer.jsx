@@ -49,8 +49,8 @@ export default function AuditViewer({ token }) {
   }, [token]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-slate-900 px-6 py-5 flex justify-between items-center">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+      <div className="bg-slate-900 px-6 py-5 flex justify-between items-center flex-shrink-0">
         <div>
           <h2 className="text-xl font-bold text-white tracking-wide">System Audit Logs</h2>
           <p className="text-slate-400 text-sm mt-1">Immutable SIEM Event Trail</p>
@@ -61,15 +61,15 @@ export default function AuditViewer({ token }) {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium">
+        <div className="bg-red-50 text-red-700 p-4 border-b border-red-100 text-sm font-medium flex-shrink-0">
           Error: {error} - Please verify the backend endpoint is running.
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="flex-1 overflow-y-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
               <th className="px-6 py-4 font-semibold">Timestamp</th>
               <th className="px-6 py-4 font-semibold">Event ID</th>
               <th className="px-6 py-4 font-semibold">Actor / Role</th>

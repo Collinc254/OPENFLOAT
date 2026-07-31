@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Convert;
+import jakarta.persistence.Column;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.openfloat.middleware.security.AttributeEncryptor;
 
@@ -35,13 +36,25 @@ public class MpesaTransaction {
     private LocalDateTime date;
 
     // ==========================================
-    // NEW DASHBOARD TRACKING FIELDS
+    // DASHBOARD TRACKING FIELDS
     // ==========================================
     private String paymentProvider = "M-PESA";
     private String paybillNumber;
     private String clientSystemName;
     private String callbackStatus = "PENDING"; 
     private String settlementStatus = "UNSETTLED"; 
+
+    // ==========================================
+    // NEW: MANUAL RECONCILIATION & AUDIT FIELDS
+    // ==========================================
+    private String reconciliationStatus = "MATCHED"; // Default assumption, set to UNMATCHED if clientSystemName is null/unknown
+    private String reconciledBy; // Stores the Admin username who resolved the suspense record
+    
+    @Column(length = 1000)
+    private String reconciliationNotes; // Administrator notes justifying the manual resolution
+    
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime resolvedAt; // The exact timestamp the record was fixed
 
     public MpesaTransaction() {}
 
@@ -59,10 +72,15 @@ public class MpesaTransaction {
         this.clientSystemName = clientSystemName;
         this.callbackStatus = callbackStatus;
         this.settlementStatus = settlementStatus;
+        
+        // Auto-flag unknown records as unmatched
+        if (this.clientSystemName == null || this.clientSystemName.trim().isEmpty() || "UNKNOWN".equalsIgnoreCase(this.clientSystemName)) {
+            this.reconciliationStatus = "UNMATCHED";
+        }
     }
 
     // ==========================================
-    // GETTERS AND SETTERS
+    // CORE GETTERS AND SETTERS
     // ==========================================
     
     public String getId() { return id; }
@@ -103,4 +121,20 @@ public class MpesaTransaction {
 
     public String getSettlementStatus() { return settlementStatus; }
     public void setSettlementStatus(String settlementStatus) { this.settlementStatus = settlementStatus; }
+
+    // ==========================================
+    // RECONCILIATION GETTERS AND SETTERS
+    // ==========================================
+
+    public String getReconciliationStatus() { return reconciliationStatus; }
+    public void setReconciliationStatus(String reconciliationStatus) { this.reconciliationStatus = reconciliationStatus; }
+
+    public String getReconciledBy() { return reconciledBy; }
+    public void setReconciledBy(String reconciledBy) { this.reconciledBy = reconciledBy; }
+
+    public String getReconciliationNotes() { return reconciliationNotes; }
+    public void setReconciliationNotes(String reconciliationNotes) { this.reconciliationNotes = reconciliationNotes; }
+
+    public LocalDateTime getResolvedAt() { return resolvedAt; }
+    public void setResolvedAt(LocalDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
 }
