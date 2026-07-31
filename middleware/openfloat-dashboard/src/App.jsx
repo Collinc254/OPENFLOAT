@@ -116,12 +116,12 @@ export default function App() {
                 <li>
                   <button 
                     onClick={() => handleTabChange('payouts')}
-                    title="B2C Payouts"
+                    title="Payouts"
                     className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
                   >
                     <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      B2C Payouts
+                      Payouts
                     </span>
                   </button>
                 </li>
@@ -227,7 +227,7 @@ export default function App() {
           {/* 3. Updated Dynamic Header Title */}
           <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
             {activeTab === 'finance' ? 'Finance & Reconciliation' : 
-             activeTab === 'payouts' ? 'B2C Payouts' : 
+             activeTab === 'payouts' ? 'Payouts' : 
              activeTab === 'clients' ? 'API Gateway' :
              `${activeTab} Dashboard`}
           </h2>
