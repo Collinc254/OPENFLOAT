@@ -345,29 +345,53 @@ export default function FinanceDashboard({ token }) {
         {/* TAB 2: SYSTEM SUMMARY */}
         {activeTab === 'reports' && (
           <div className="p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Total Revenue: KES {report.totalRevenue.toLocaleString()}</h3>
-             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
-                  <th className="px-6 py-3 font-semibold">Client System</th>
-                  <th className="px-6 py-3 font-semibold">Total Revenue</th>
-                  <th className="px-6 py-3 font-semibold text-center">Total Txns</th>
-                  <th className="px-6 py-3 font-semibold text-center text-green-600">Success</th>
-                  <th className="px-6 py-3 font-semibold text-center text-red-500">Failed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {report.systemBreakdown.map((sys, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 font-bold text-slate-800">{sys.name}</td>
-                      <td className="px-6 py-4 font-semibold text-green-700">KES {sys.revenue.toLocaleString()}</td>
-                      <td className="px-6 py-4 font-medium text-slate-600 text-center">{sys.total}</td>
-                      <td className="px-6 py-4 font-medium text-green-600 text-center">{sys.success}</td>
-                      <td className="px-6 py-4 font-medium text-red-500 text-center">{sys.failed}</td>
-                    </tr>
-                ))}
-              </tbody>
-            </table>
+            
+            {/* Top Level KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-green-500">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Revenue</p>
+                <h3 className="text-2xl font-black text-slate-800">KES {report.totalRevenue.toLocaleString()}</h3>
+              </div>
+              <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Callback Success Rate</p>
+                <h3 className="text-2xl font-black text-slate-800">{report.successRate}%</h3>
+              </div>
+              <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Successful Payments</p>
+                <h3 className="text-2xl font-black text-slate-800">{report.successCount} <span className="text-sm font-medium text-slate-400">/ {report.totalCount}</span></h3>
+              </div>
+              <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Failed Payments</p>
+                <h3 className="text-2xl font-black text-slate-800">{report.failedCount}</h3>
+              </div>
+            </div>
+
+            {/* Client System Breakdown Table */}
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Revenue by Client System</h3>
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                    <th className="px-6 py-3 font-semibold">Client System</th>
+                    <th className="px-6 py-3 font-semibold">Total Revenue</th>
+                    <th className="px-6 py-3 font-semibold text-center">Total Txns</th>
+                    <th className="px-6 py-3 font-semibold text-center text-green-600">Success</th>
+                    <th className="px-6 py-3 font-semibold text-center text-red-500">Failed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {report.systemBreakdown.map((sys, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 font-bold text-slate-800">{sys.name}</td>
+                        <td className="px-6 py-4 font-semibold text-green-700">KES {sys.revenue.toLocaleString()}</td>
+                        <td className="px-6 py-4 font-medium text-slate-600 text-center">{sys.total}</td>
+                        <td className="px-6 py-4 font-medium text-green-600 text-center">{sys.success}</td>
+                        <td className="px-6 py-4 font-medium text-red-500 text-center">{sys.failed}</td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -499,7 +523,7 @@ export default function FinanceDashboard({ token }) {
 
                   {auditResults.missingInDatabase.length === 0 && auditResults.mismatchedAmounts.length === 0 && (
                      <div className="bg-green-100 text-green-800 p-4 rounded-lg text-center font-bold text-sm">
-                       ✅ Audit Passed: 100% Reconciliation Accuracy.
+                       Audit Passed: 100% Reconciliation Accuracy.
                      </div>
                   )}
                 </div>
