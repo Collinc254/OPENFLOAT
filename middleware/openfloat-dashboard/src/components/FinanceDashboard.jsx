@@ -186,7 +186,7 @@ export default function FinanceDashboard({ token }) {
     }
   };
 
-  // --- NEW FEATURE: BACKEND PDF/EXCEL EXPORT ENGINE ---
+  // --- BACKEND PDF/EXCEL EXPORT ENGINE ---
   const downloadBackendReport = async (type) => {
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
@@ -401,7 +401,18 @@ export default function FinanceDashboard({ token }) {
                    <td className="px-6 py-4 font-mono text-xs">{tx.clientSystem}<br/><span className="text-slate-400">{tx.id}</span></td>
                    <td className="px-6 py-4 font-mono font-medium">{tx.mpesaRef}</td>
                    <td className="px-6 py-4 font-semibold">KES {tx.amount}</td>
-                   <td className="px-6 py-4"><span className="px-2 py-1 rounded text-xs font-bold bg-slate-100">{tx.status}</span></td>
+                   <td className="px-6 py-4">
+                     {/* ============================================== */}
+                     {/* FIX: Dynamic Status Colors matching Operator Dashboard */}
+                     {/* ============================================== */}
+                     <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider border ${
+                        ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status) ? 'bg-green-50 text-green-700 border-green-200' :
+                        tx.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      }`}>
+                        {tx.status}
+                      </span>
+                   </td>
                  </tr>
                ))}
              </tbody>

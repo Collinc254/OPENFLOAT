@@ -44,27 +44,32 @@ public class DashboardController {
                 .filter(tx -> tx.getDate() != null && tx.getDate().isAfter(startOfMonth))
                 .count();
 
-        // 2. Financials (Fixed Null Type Safety Warnings)
+        // 2. Financials (FIXED: Now includes "PAID")
         BigDecimal totalTransactionValue = allTx.stream()
-                .filter(tx -> "SUCCESS".equals(tx.getStatus()) || "COMPLETED".equals(tx.getStatus()))
-                .filter(tx -> tx.getAmount() != null) // Safely ignores null amounts to prevent crashes
+                .filter(tx -> {
+                    String s = tx.getStatus();
+                    return "SUCCESS".equals(s) || "COMPLETED".equals(s) || "PAID".equals(s);
+                })
+                .filter(tx -> tx.getAmount() != null)
                 .map(MpesaTransaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 3. Callback & System Health
+        // 3. Callback & System Health (FIXED: Now includes "PAID")
         long totalProcessed = allTx.size();
-        long successfulCallbacks = allTx.stream().filter(tx -> "SUCCESS".equals(tx.getStatus())).count();
+        long successfulCallbacks = allTx.stream().filter(tx -> {
+            String s = tx.getStatus();
+            return "SUCCESS".equals(s) || "COMPLETED".equals(s) || "PAID".equals(s);
+        }).count();
         long failedCallbacks = allTx.stream().filter(tx -> "FAILED".equals(tx.getStatus())).count();
         
         double successPercentage = totalProcessed > 0 ? ((double) successfulCallbacks / totalProcessed) * 100 : 0.0;
 
-        // 4. Exceptions & Recon (Fixed getClientSystem() error)
-        // We now rely safely on ReconciliationStatus which exists in your entity
+        // 4. Exceptions & Recon (FIXED: Safely catches nulls as unmatched/pending)
         long unknownReferences = allTx.stream()
-                .filter(tx -> "UNMATCHED".equals(tx.getReconciliationStatus()))
+                .filter(tx -> tx.getReconciliationStatus() == null || "UNMATCHED".equals(tx.getReconciliationStatus()))
                 .count();
                 
-        long pendingReconciliations = unknownReferences; // UNMATCHED transactions are inherently pending recon
+        long pendingReconciliations = unknownReferences;
 
         // 5. API Gateway Metrics
         long registeredClients = clientRepository.count();
