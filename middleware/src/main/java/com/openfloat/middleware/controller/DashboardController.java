@@ -28,7 +28,7 @@ public class DashboardController {
     private final ClientSystemRepository clientRepository;
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('OPERATOR', 'MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF', 'USER', 'OPERATOR', 'MANAGER', 'ADMIN')") // FIXED: Added STAFF and USER roles
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         List<MpesaTransaction> allTx = transactionRepository.findAll();
         
