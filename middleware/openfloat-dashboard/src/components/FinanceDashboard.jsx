@@ -186,6 +186,37 @@ export default function FinanceDashboard({ token }) {
     }
   };
 
+  // --- NEW FEATURE: BACKEND PDF/EXCEL EXPORT ENGINE ---
+  const downloadBackendReport = async (type) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      const endpoint = type === 'excel' 
+        ? `${API_URL}/api/v1/reports/transactions/excel`
+        : `${API_URL}/api/v1/reports/transactions/pdf`;
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error(`Failed to generate ${type.toUpperCase()} report from server.`);
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `transactions_report.${type === 'excel' ? 'xlsx' : 'pdf'}`);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      setShowExportMenu(false);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
 
   // --- CSV EXPORT ENGINE ---
   const downloadCSV = (exportType) => {
@@ -291,10 +322,19 @@ export default function FinanceDashboard({ token }) {
           
           <div className="relative">
             <button onClick={() => setShowExportMenu(!showExportMenu)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded border border-slate-700 text-sm font-medium transition-colors flex items-center gap-2">
-              Export CSV ▼
+              Export Reports ▼
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
+                {/* 1. Official Backend Reports */}
+                <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Official Reports</div>
+                <button onClick={() => downloadBackendReport('pdf')} className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-slate-100 font-semibold">Download PDF Report</button>
+                <button onClick={() => downloadBackendReport('excel')} className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-slate-100 font-semibold">Download Excel Report</button>
+                
+                <div className="border-t border-slate-100 my-1"></div>
+                
+                {/* 2. Local CSV Exports */}
+                <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Local CSV Exports</div>
                 <button onClick={() => downloadCSV('ALL')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export All Records</button>
                 <button onClick={() => downloadCSV('SUCCESS')} className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-slate-100">Export Successful</button>
                 <button onClick={() => downloadCSV('FAILED')} className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-slate-100">Export Failed</button>

@@ -1,30 +1,62 @@
 import { useState, useRef, useEffect } from 'react';
 
 export default function OperatorDashboard() {
-  // Mode toggles
+  // ==========================================
+  // 1. DASHBOARD STATE & FETCHING
+  // ==========================================
+  const [stats, setStats] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState('');
+
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      
+      const response = await fetch(`${API_URL}/api/v1/dashboard/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch dashboard statistics');
+      
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  // Poll dashboard every 15 seconds
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+
+  // ==========================================
+  // 2. TRANSACTION TRIGGER STATE (Original Logic)
+  // ==========================================
   const [processingMode, setProcessingMode] = useState('single');
   const [transactionType, setTransactionType] = useState('STK Push');
   
-  // Single transaction state 
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [amount, setAmount] = useState('');
   
-  // Batch transaction state
   const [batchFile, setBatchFile] = useState(null);
   const [batchData, setBatchData] = useState([]);
   const [batchTotal, setBatchTotal] = useState(0);
   const fileInputRef = useRef(null);
 
-  // Global submission & polling state
   const [status, setStatus] = useState('idle'); 
   const [message, setMessage] = useState('');
   const [activeTxRef, setActiveTxRef] = useState(null);
-
-  // THE FIX: Explicit processing lock state
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- 1. INPUT VALIDATION & AUTO-FORMATTING ---
+  // --- INPUT VALIDATION ---
   const handlePhoneChange = (e) => {
     const cleaned = e.target.value.replace(/\D/g, '');
     
@@ -92,7 +124,7 @@ export default function OperatorDashboard() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
- // --- 2. ASYNCHRONOUS POLLING ENGINE ---
+  // --- ASYNCHRONOUS POLLING ENGINE ---
   useEffect(() => {
     let pollInterval;
     let timeout;
@@ -101,33 +133,32 @@ export default function OperatorDashboard() {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
       pollInterval = setInterval(() => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
 
         fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         })
           .then((res) => {
             if (!res.ok) throw new Error('Transaction not found yet');
             return res.json();
           })
           .then((data) => {
-            // THE FIX: Accept SUCCESS, PAID, or COMPLETED variations from backend
             if (data.status === 'SUCCESS' || data.status === 'PAID' || data.status === 'COMPLETED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('success');
               setMessage(`Payment Successful! Receipt: ${data.receiptNumber}`); 
               setActiveTxRef(null);
-              setIsProcessing(false); // RELEASE LOCK
+              setIsProcessing(false);
+              fetchStats(); // Instantly refresh dashboard on success
             } else if (data.status === 'FAILED') {
               clearInterval(pollInterval);
               clearTimeout(timeout);
               setStatus('error');
               setMessage('Payment Failed.');
               setActiveTxRef(null);
-              setIsProcessing(false); // RELEASE LOCK
+              setIsProcessing(false);
+              fetchStats(); // Instantly refresh dashboard on failure
             }
           })
           .catch((err) => console.log('Waiting for callback to write to database...'));
@@ -138,7 +169,7 @@ export default function OperatorDashboard() {
         setStatus('error');
         setMessage('Transaction Timed Out: The customer did not enter their PIN within the expected window.');
         setActiveTxRef(null);
-        setIsProcessing(false); // RELEASE LOCK
+        setIsProcessing(false);
       }, 90000);
     }
 
@@ -152,7 +183,6 @@ export default function OperatorDashboard() {
   const handleExecute = async (e) => {
     e.preventDefault();
 
-    // 1. HARD LOCK TO PREVENT DOUBLE CLICKS
     if (isProcessing) return;
     
     if (processingMode === 'single') {
@@ -165,16 +195,13 @@ export default function OperatorDashboard() {
 
     if (phoneError) return; 
 
-    // 2. ENGAGE LOCK & SET UI STATE
     setIsProcessing(true);
     setStatus('loading');
     setMessage('');
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
-      
       const cleanPhone = phone.replace(/\s/g, '');
-      
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const txRef = `INV-${Date.now()}-${randomSuffix}`;
       
@@ -183,7 +210,7 @@ export default function OperatorDashboard() {
         : { type: transactionType, totalAmount: batchTotal, count: batchData.length, records: batchData, batchRef: txRef, tenantId: "ORG-001" };
 
       if (processingMode === 'single') {
-        const token = localStorage.getItem('token'); 
+        const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
 
         const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
@@ -201,7 +228,6 @@ export default function OperatorDashboard() {
         const responseData = await response.json();
         const checkoutId = responseData.CheckoutRequestID || responseData.checkoutRequestID || responseData.checkoutRequestId;
 
-        // Transition to polling, keep isProcessing TRUE
         setStatus('polling');
         setActiveTxRef(checkoutId); 
         setMessage('Awaiting customer PIN entry...'); 
@@ -209,182 +235,271 @@ export default function OperatorDashboard() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         setStatus('success');
         setMessage(`Batch ${transactionType} queued successfully. Processing ${batchData.length} records.`);
-        setIsProcessing(false); // Release for batch immediately
+        setIsProcessing(false); 
       }
       
     } catch (error) {
       console.error('Payment Error:', error);
       setStatus('error');
       setMessage('Network error. Unable to reach the OpenFloat servers.');
-      setIsProcessing(false); // Release lock on network crash
+      setIsProcessing(false);
     }
   };
 
+
+  // ==========================================
+  // RENDER INTERFACE
+  // ==========================================
   return (
-    <div className="w-full h-full flex flex-col bg-slate-50">
+    <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full flex flex-col max-w-[1400px] mx-auto w-full">
       
-      {/* 1. FLUSH HEADER: Sits tight against sidebar and top nav (no borders, full width) */}
-      <div className="bg-slate-900 border-b border-slate-800 flex-shrink-0">
-        <div className="px-6 py-4 flex flex-col justify-center text-center">
-          <h2 className="text-xl font-bold text-white tracking-wide">Manual B2C / STK Trigger</h2>
-          <p className="text-slate-400 text-xs mt-1">Initiate a single payment or process a mass disbursement</p>
+      {/* 1. HEADER SECTION */}
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800">Operator Console</h2>
+          <p className="text-slate-500 text-sm mt-1">System overview and manual transaction triggers.</p>
         </div>
-        
-        <div className="flex justify-center px-6 gap-8">
-          <button 
-            onClick={() => { setProcessingMode('single'); setStatus('idle'); setMessage(''); }}
-            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
-          >
-            Single Transaction
-          </button>
-          <button 
-            onClick={() => { setProcessingMode('batch'); setStatus('idle'); setMessage(''); setTransactionType('B2C Salary'); }}
-            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors px-2 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
-          >
-            Batch Upload (CSV)
-          </button>
+        <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full shadow-sm">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+          </span>
+          <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Live</span>
         </div>
       </div>
 
-      {/* 2. COMPACT FORM CONTAINER: Takes up remaining height and centers the white card */}
-      <div className="flex-1 flex flex-col justify-center p-4 sm:p-6 overflow-y-auto">
-        <div className="max-w-lg mx-auto w-full bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-200">
-          <form onSubmit={handleExecute} className="space-y-3">
-            
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Transaction Type</label>
-              <div className="relative">
-                <select
-                  value={transactionType}
-                  onChange={(e) => setTransactionType(e.target.value)}
-                  disabled={isProcessing}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors outline-none text-slate-700 text-sm font-medium appearance-none disabled:opacity-50"
-                >
-                  {processingMode === 'single' && <option value="STK Push">C2B STK Push (Collection)</option>}
-                  <option value="B2C Salary">B2C Salary (Disbursement)</option>
-                  <option value="B2C Refund">B2C Refund (Disbursement)</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+      {/* 2. KPI DASHBOARD GRID */}
+      {dashboardError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-medium">
+          Dashboard Sync Error: {dashboardError}
+        </div>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative">
+        {dashboardLoading && !stats && (
+          <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          </div>
+        )}
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Processed Value</p>
+          <h3 className="text-2xl font-black text-slate-800 mb-1">KES {stats?.totalTransactionValue?.toLocaleString() || 0}</h3>
+          <div className="flex justify-between text-sm mt-4 pt-4 border-t border-slate-100">
+            <span className="text-slate-500">Today: <strong className="text-slate-800">{stats?.paymentsToday || 0}</strong></span>
+            <span className="text-slate-500">Month: <strong className="text-slate-800">{stats?.paymentsThisMonth || 0}</strong></span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">API Gateway</p>
+          <h3 className="text-2xl font-black text-slate-800 mb-1">{stats?.registeredClients || 0} <span className="text-sm font-medium text-slate-400">Clients</span></h3>
+          <div className="flex justify-between text-sm mt-4 pt-4 border-t border-slate-100">
+            <span className="text-slate-500">Active Keys: <strong className="text-green-600">{stats?.activeApiKeys || 0}</strong></span>
+            <span className="text-slate-500">Active Users: <strong className="text-blue-600">{stats?.activeUsers || 0}</strong></span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Callback Health</p>
+          <h3 className="text-2xl font-black text-slate-800 mb-1">{stats?.callbackSuccessPercentage || 0}%</h3>
+          <div className="flex justify-between text-sm mt-4 pt-4 border-t border-slate-100">
+            <span className="text-slate-500">Failed: <strong className="text-red-500">{stats?.failedCallbacks || 0}</strong></span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-500">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Reconciliation Pipeline</p>
+          <h3 className="text-2xl font-black text-orange-600 mb-1">{stats?.pendingReconciliations || 0} <span className="text-sm font-medium text-slate-400">Pending</span></h3>
+          <div className="flex justify-between text-sm mt-4 pt-4 border-t border-slate-100">
+            <span className="text-slate-500">Unknown Refs: <strong className="text-orange-600">{stats?.unknownReferences || 0}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. MAIN WORKSPACE GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+        
+        {/* LEFT COLUMN: TRIGGER FORM */}
+        <div className="lg:col-span-1 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-900 border-b border-slate-800 p-4">
+            <h3 className="font-bold text-white text-center mb-3">Manual Transaction Trigger</h3>
+            <div className="flex justify-center gap-6">
+              <button 
+                onClick={() => { setProcessingMode('single'); setStatus('idle'); setMessage(''); }}
+                className={`pb-1.5 text-xs font-bold border-b-2 transition-colors px-1 ${processingMode === 'single' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+              >
+                Single Entry
+              </button>
+              <button 
+                onClick={() => { setProcessingMode('batch'); setStatus('idle'); setMessage(''); setTransactionType('B2C Salary'); }}
+                className={`pb-1.5 text-xs font-bold border-b-2 transition-colors px-1 ${processingMode === 'batch' ? 'text-green-400 border-green-400' : 'text-slate-400 border-transparent hover:text-slate-200'}`}
+              >
+                Batch Upload (CSV)
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-5">
+            <form onSubmit={handleExecute} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Transaction Type</label>
+                <div className="relative">
+                  <select
+                    value={transactionType}
+                    onChange={(e) => setTransactionType(e.target.value)}
+                    disabled={isProcessing}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-slate-700 text-sm font-medium appearance-none disabled:opacity-50"
+                  >
+                    {processingMode === 'single' && <option value="STK Push">C2B STK Push (Collection)</option>}
+                    <option value="B2C Salary">B2C Salary (Disbursement)</option>
+                    <option value="B2C Refund">B2C Refund (Disbursement)</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <hr className="border-slate-100 my-2" />
+              {processingMode === 'single' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Target M-Pesa Number</label>
+                    <input 
+                      type="text" value={phone} onChange={handlePhoneChange} disabled={isProcessing} required
+                      className={`w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 outline-none text-slate-700 font-mono tracking-wide disabled:opacity-50
+                        ${phoneError ? 'border-red-300 focus:ring-red-500' : 'border-slate-200 focus:ring-green-500'}`}
+                    />
+                    {phoneError && <p className="text-red-500 text-[10px] font-bold mt-1">{phoneError}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Amount (KES)</label>
+                    <input 
+                      type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={isProcessing} min="1" required
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-slate-700 font-medium text-sm disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              )}
 
-            {processingMode === 'single' && (
-              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Target M-Pesa Number</label>
-                  <input 
-                    type="text" 
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    disabled={isProcessing}
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:outline-none text-slate-700 font-mono tracking-wide disabled:opacity-50 transition-colors
-                      ${phoneError ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-slate-200 focus:ring-green-500 focus:border-green-500'}`}
-                    required
-                  />
-                  {phoneError && (
-                    <p className="text-red-500 text-xs font-bold mt-1 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                      {phoneError}
-                    </p>
+              {processingMode === 'batch' && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {!batchFile ? (
+                    <div 
+                      className="w-full border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer p-4 text-center"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <svg className="mx-auto h-6 w-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                      <p className="text-xs font-bold text-green-600 mt-2">Upload a CSV file</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Format: Phone, Amount</p>
+                      <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={handleFileUpload} />
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+                      <div className="flex justify-between items-start mb-2 border-b border-slate-200 pb-2">
+                        <div>
+                          <h3 className="font-bold text-xs text-slate-800 truncate max-w-[120px]">{batchFile.name}</h3>
+                          <p className="text-[10px] text-slate-500">{batchData.length} records</p>
+                        </div>
+                        <div className="text-right">
+                          <h3 className="font-bold text-xs text-slate-800">KES {batchTotal.toLocaleString()}</h3>
+                          <button type="button" onClick={clearBatch} disabled={isProcessing} className="text-[10px] text-red-500 hover:text-red-700 font-semibold disabled:opacity-50">Remove</button>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        {batchData.slice(0, 3).map((row, idx) => (
+                          <div key={idx} className="flex justify-between text-[10px] bg-white p-1.5 rounded border border-slate-100">
+                            <span className="font-mono text-slate-600">{row.phone}</span>
+                            <span className="font-semibold text-slate-800">KES {row.amount}</span>
+                          </div>
+                        ))}
+                        {batchData.length > 3 && <div className="text-center text-[10px] text-slate-400 pt-1">+{batchData.length - 3} more</div>}
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Amount (KES)</label>
-                  <input 
-                    type="number" 
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    disabled={isProcessing}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-slate-700 font-medium text-sm disabled:opacity-50"
-                    min="1"
-                    required
-                  />
-                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
+                className={`w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all flex justify-center items-center gap-2 mt-2
+                  ${isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
+                    ? 'bg-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-sm'}`}
+              >
+                 {status === 'loading' && 'Initiating...'}
+                 {status === 'polling' && (
+                   <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Awaiting PIN...</>
+                 )}
+                 {!isProcessing && `Execute ${processingMode === 'batch' ? 'Batch' : ''}`}
+              </button>
+            </form>
+
+            {message && (
+              <div className={`mt-4 p-2.5 rounded-lg text-xs font-medium animate-in fade-in
+                ${status === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : ''}
+                ${status === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : ''}
+                ${status === 'polling' ? 'bg-blue-50 text-blue-800 border border-blue-200' : ''}
+              `}>
+                <p>{message}</p>
               </div>
             )}
+          </div>
+        </div>
 
-            {processingMode === 'batch' && (
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {!batchFile ? (
-                  <div 
-                    className="w-full border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className="px-6 py-6 text-center">
-                      <svg className="mx-auto h-8 w-8 text-slate-400 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                      <div className="mt-2 flex text-sm text-slate-600 justify-center">
-                        <span className="relative font-bold text-green-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 hover:text-green-500">
-                          Upload a CSV file
-                        </span>
-                        <p className="pl-1">or drag and drop</p>
+        {/* RIGHT COLUMN: LIVE ACTIVITY FEED */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
+            <h3 className="text-sm font-bold text-slate-800">Live Transaction Activity</h3>
+            <span className="text-xs text-slate-400 font-medium">Auto-refreshes</span>
+          </div>
+          <div className="flex-1 overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[500px]">
+              <thead>
+                <tr className="bg-white text-slate-400 text-[10px] uppercase tracking-wider border-b border-slate-100">
+                  <th className="px-5 py-3 font-semibold">Time</th>
+                  <th className="px-5 py-3 font-semibold">Receipt</th>
+                  <th className="px-5 py-3 font-semibold">Client</th>
+                  <th className="px-5 py-3 font-semibold">Amount</th>
+                  <th className="px-5 py-3 font-semibold text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {stats?.liveActivity?.length === 0 || !stats ? (
+                  <tr>
+                    <td colSpan="5" className="px-5 py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center">
+                        <svg className="w-8 h-8 text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Waiting for live activity...
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">Format: Phone, Amount (e.g. 254700111222, 1500)</p>
-                    </div>
-                    <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={handleFileUpload} />
-                  </div>
+                    </td>
+                  </tr>
                 ) : (
-                  <div className="w-full bg-slate-50 rounded-lg border border-slate-200 p-4">
-                    <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-2">
-                      <div>
-                        <h3 className="font-bold text-sm text-slate-800">{batchFile.name}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">{batchData.length} records parsed</p>
-                      </div>
-                      <div className="text-right">
-                        <h3 className="font-bold text-sm text-slate-800">KES {batchTotal.toLocaleString()}</h3>
-                        <button type="button" onClick={clearBatch} disabled={isProcessing} className="text-[10px] text-red-500 hover:text-red-700 font-semibold mt-0.5 disabled:opacity-50">Remove File</button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      {batchData.slice(0, 3).map((row, idx) => (
-                        <div key={idx} className="flex justify-between text-xs bg-white p-2 rounded border border-slate-100 shadow-sm">
-                          <span className="font-mono text-slate-600">{row.phone}</span>
-                          <span className="font-semibold text-slate-800">KES {row.amount}</span>
-                        </div>
-                      ))}
-                      {batchData.length > 3 && (
-                        <div className="text-center text-xs text-slate-400 font-medium pt-1">
-                          + {batchData.length - 3} more records
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  stats.liveActivity?.map((tx, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3 text-slate-500 font-mono text-[11px]">
+                        {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td className="px-5 py-3 font-mono font-bold text-slate-800 text-xs">{tx.mpesaRef || tx.id}</td>
+                      <td className="px-5 py-3">
+                        <span className="font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">{tx.clientSystem || 'UNKNOWN'}</span>
+                      </td>
+                      <td className="px-5 py-3 font-black text-slate-800 text-xs">KES {tx.amount}</td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${
+                          tx.status === 'SUCCESS' ? 'bg-green-50 text-green-700 border-green-200' :
+                          tx.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200' :
+                          'bg-yellow-50 text-yellow-700 border-yellow-200'
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </div>
-            )}
-
-            <button 
-              type="submit" 
-              disabled={isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0)}
-              className={`w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all flex justify-center items-center gap-2 mt-2
-                ${isProcessing || !!phoneError || (processingMode === 'batch' && batchData.length === 0) 
-                  ? 'bg-slate-300 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 shadow-sm hover:shadow'}`}
-            >
-               {status === 'loading' && 'Initiating...'}
-               {status === 'polling' && (
-                 <>
-                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                   Awaiting PIN...
-                 </>
-               )}
-               {!isProcessing && `Execute ${processingMode === 'batch' ? 'Batch ' : ''}${transactionType.split(' ')[0]}`}
-            </button>
-          </form>
-
-          {message && (
-            <div className={`mt-4 p-2.5 rounded-lg flex items-start gap-2 text-xs font-medium w-full animate-in fade-in
-              ${status === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : ''}
-              ${status === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : ''}
-              ${status === 'polling' ? 'bg-blue-50 text-blue-800 border border-blue-200' : ''}
-            `}>
-              <p>{message}</p>
-            </div>
-          )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
