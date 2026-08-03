@@ -487,7 +487,7 @@ export default function OperatorDashboard() {
                       <td className="px-5 py-3 font-black text-slate-800 text-xs">KES {tx.amount}</td>
                       <td className="px-5 py-3 text-right">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${
-                          tx.status === 'SUCCESS' ? 'bg-green-50 text-green-700 border-green-200' :
+                          ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status) ? 'bg-green-50 text-green-700 border-green-200' :
                           tx.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200' :
                           'bg-yellow-50 text-yellow-700 border-yellow-200'
                         }`}>
