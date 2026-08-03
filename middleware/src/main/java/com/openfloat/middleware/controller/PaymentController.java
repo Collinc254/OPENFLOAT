@@ -11,11 +11,15 @@ import com.openfloat.middleware.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 // THE FIX: Using originPatterns instead of origins to support credentialed requests (Authorization headers)
@@ -85,8 +89,18 @@ public class PaymentController {
         tx.setClientSystemName(request.system());
         tx.setReconciliationStatus("RESOLVED");
         
-        // In a production app, fetch the logged-in admin's username from SecurityContextHolder
-        String currentUser = "Collins / ADMIN"; 
+        // --- DYNAMIC USER EXTRACTION START ---
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        String currentUsername = authentication.getName(); 
+        
+        String currentRoles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .map(role -> role.replace("ROLE_", "")) 
+                .collect(Collectors.joining(", "));
+
+        String currentUser = currentUsername + " / " + currentRoles;
+        // --- DYNAMIC USER EXTRACTION END ---
         
         tx.setReconciledBy(currentUser);
         tx.setReconciliationNotes(request.note());

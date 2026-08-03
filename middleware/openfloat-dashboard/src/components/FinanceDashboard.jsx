@@ -5,6 +5,7 @@ export default function FinanceDashboard({ token }) {
   const [activeTab, setActiveTab] = useState('transactions'); 
   const [showFilters, setShowFilters] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [summaryTimeRange, setSummaryTimeRange] = useState('all-time'); // Time Range State
 
   // Resolution Modal State (Feature 7)
   const [resolvingTx, setResolvingTx] = useState(null);
@@ -220,12 +221,37 @@ export default function FinanceDashboard({ token }) {
     setShowExportMenu(false);
   };
 
-  // --- ANALYTICS ENGINE ---
+  // --- ANALYTICS ENGINE WITH TIME FILTERING ---
   const report = useMemo(() => {
     let totalRevenue = 0; let successCount = 0; let failedCount = 0;
     const systems = {};
+    const now = new Date();
 
-    transactions.forEach(tx => {
+    // 1. Filter transactions based on the selected time range
+    const filteredTransactions = transactions.filter(tx => {
+      if (!tx.date) return true;
+      const txDate = new Date(tx.date);
+      if (isNaN(txDate.getTime())) return true;
+
+      switch (summaryTimeRange) {
+        case 'today':
+          return txDate.toDateString() === now.toDateString();
+        case 'this-week': {
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return txDate >= oneWeekAgo;
+        }
+        case 'this-month':
+          return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+        case 'this-year':
+          return txDate.getFullYear() === now.getFullYear();
+        case 'all-time':
+        default:
+          return true;
+      }
+    });
+
+    // 2. Calculate metrics based on the filtered transactions
+    filteredTransactions.forEach(tx => {
       const isSuccess = ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status);
       const sys = tx.clientSystem;
 
@@ -241,11 +267,11 @@ export default function FinanceDashboard({ token }) {
     });
 
     return {
-      totalRevenue, successCount, failedCount, totalCount: transactions.length,
-      successRate: transactions.length > 0 ? ((successCount / transactions.length) * 100).toFixed(1) : 0,
+      totalRevenue, successCount, failedCount, totalCount: filteredTransactions.length,
+      successRate: filteredTransactions.length > 0 ? ((successCount / filteredTransactions.length) * 100).toFixed(1) : 0,
       systemBreakdown: Object.values(systems).sort((a, b) => b.revenue - a.revenue)
     };
-  }, [transactions]);
+  }, [transactions, summaryTimeRange]);
 
   const unmatchedTransactions = transactions.filter(tx => tx.reconciliationStatus === 'UNMATCHED');
 
@@ -346,6 +372,29 @@ export default function FinanceDashboard({ token }) {
         {activeTab === 'reports' && (
           <div className="p-6">
             
+            {/* Time Period Segmented Control */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+              <h3 className="text-lg font-bold text-slate-800">Revenue Metrics</h3>
+              <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 overflow-x-auto max-w-full">
+                {['Today', 'This Week', 'This Month', 'This Year', 'All Time'].map((period) => {
+                  const value = period.toLowerCase().replace(' ', '-');
+                  return (
+                    <button
+                      key={period}
+                      onClick={() => setSummaryTimeRange(value)}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${
+                        summaryTimeRange === value
+                          ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Top Level KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-green-500">

@@ -42,4 +42,12 @@ public class WebhookDeliveryLog {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime attemptedAt;
+
+    // --- NEW FIELDS FOR RESEND LOGIC ---
+    @Column(nullable = false)
+    private Integer retryCount = 0;
+
+    private Long responseTimeMs;
+
+    private LocalDateTime lastRetryTime;
 }

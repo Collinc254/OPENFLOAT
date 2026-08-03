@@ -5,7 +5,8 @@ import FinanceDashboard from './components/FinanceDashboard';
 import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
 import Payouts from './components/Payouts'; 
-import ClientManagement from './components/ClientManagement'; // 1. Added Import
+import ClientManagement from './components/ClientManagement';
+import NotificationBell from './components/NotificationBell'; // Added Import
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -214,23 +215,31 @@ export default function App() {
 
       <main className="flex-1 flex flex-col h-screen overflow-x-hidden relative">
         
-        <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center shadow-sm z-10 h-20 shrink-0">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 mr-4 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-          </button>
+        {/* UPDATED HEADER: flex-justify-between and added the NotificationBell */}
+        <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between shadow-sm z-10 h-20 shrink-0">
+          <div className="flex items-center">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 mr-4 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 hover:text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
 
-          {/* 3. Updated Dynamic Header Title */}
-          <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
-            {activeTab === 'finance' ? 'Finance & Reconciliation' : 
-             activeTab === 'payouts' ? 'Payouts' : 
-             activeTab === 'clients' ? 'API Gateway' :
-             `${activeTab} Dashboard`}
-          </h2>
+            {/* 3. Updated Dynamic Header Title */}
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
+              {activeTab === 'finance' ? 'Finance & Reconciliation' : 
+               activeTab === 'payouts' ? 'Payouts' : 
+               activeTab === 'clients' ? 'API Gateway' :
+               `${activeTab} Dashboard`}
+            </h2>
+          </div>
+
+          {/* ADDED NOTIFICATION BELL HERE */}
+          <div className="flex items-center gap-4">
+            <NotificationBell token={user.token} />
+          </div>
         </header>
         
         <div className="flex-1 overflow-x-hidden bg-slate-50 relative flex flex-col h-full">

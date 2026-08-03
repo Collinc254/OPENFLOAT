@@ -4,59 +4,83 @@ export default function AuditViewer({ token }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchAuditLogs = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      
+      const response = await fetch(`${API_URL}/api/v1/audit-logs`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch live audit logs.');
+      }
+
+      const data = await response.json();
+
+      // Map backend Spring Boot entity fields to frontend table columns
+      const formattedData = data.map(log => ({
+        id: log.eventId || log.id || 'N/A',
+        timestamp: log.timestamp || 'Just now',
+        actor: log.actor || 'SYSTEM',
+        action: log.action || 'Unknown Action',
+        target: log.targetComponent || log.target || 'N/A',
+        status: log.status || 'UNKNOWN'
+      }));
+
+      setLogs(formattedData);
+    } catch (err) {
+      console.error('Audit Log connection error:', err.message);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchAuditLogs = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
-        
-        const response = await fetch(`${API_URL}/api/v1/audit-logs`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch live audit logs.');
-        }
-
-        const data = await response.json();
-
-        // Map backend Spring Boot entity fields to frontend table columns
-        const formattedData = data.map(log => ({
-          id: log.eventId || log.id || 'N/A',
-          timestamp: log.timestamp || 'Just now',
-          actor: log.actor || 'SYSTEM',
-          action: log.action || 'Unknown Action',
-          target: log.targetComponent || log.target || 'N/A',
-          status: log.status || 'UNKNOWN'
-        }));
-
-        setLogs(formattedData);
-      } catch (err) {
-        console.error('Audit Log connection error:', err.message);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (token) {
       fetchAuditLogs();
     }
   }, [token]);
 
+  // Filter logs based on search term
+  const filteredLogs = logs.filter(log => {
+    const term = searchTerm.toLowerCase();
+    return (
+      (log.actor && log.actor.toLowerCase().includes(term)) ||
+      (log.action && log.action.toLowerCase().includes(term)) ||
+      (log.target && log.target.toLowerCase().includes(term)) ||
+      (log.id && log.id.toLowerCase().includes(term))
+    );
+  });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-      <div className="bg-slate-900 px-6 py-5 flex justify-between items-center flex-shrink-0">
+      <div className="bg-slate-900 px-6 py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
         <div>
           <h2 className="text-xl font-bold text-white tracking-wide">System Audit Logs</h2>
           <p className="text-slate-400 text-sm mt-1">Immutable SIEM Event Trail</p>
         </div>
-        <div className="px-3 py-1 bg-slate-800 text-xs font-mono text-green-400 rounded border border-slate-700">
-          SECURE MODE: READ-ONLY
+        
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <input 
+            type="text" 
+            placeholder="Search events, users, IDs..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-64 px-4 py-2 bg-slate-800 border border-slate-700 text-white rounded text-sm outline-none focus:border-green-500 placeholder-slate-400 font-sans"
+          />
+          <div className="hidden md:block px-3 py-1.5 bg-slate-800 text-xs font-mono text-green-400 rounded border border-slate-700 whitespace-nowrap">
+            SECURE MODE: READ-ONLY
+          </div>
         </div>
       </div>
 
@@ -86,14 +110,14 @@ export default function AuditViewer({ token }) {
                   Retrieving secure logs...
                 </td>
               </tr>
-            ) : logs.length === 0 && !error ? (
+            ) : filteredLogs.length === 0 && !error ? (
               <tr>
                 <td colSpan="6" className="px-6 py-12 text-center text-slate-500 font-sans">
-                  No audit logs found in the database.
+                  {searchTerm ? 'No matching audit logs found for your search.' : 'No audit logs found in the database.'}
                 </td>
               </tr>
             ) : (
-              logs.map((log, index) => (
+              filteredLogs.map((log, index) => (
                 <tr key={log.id || index} className="hover:bg-slate-50 transition-colors text-xs">
                   <td className="px-6 py-3 whitespace-nowrap text-slate-500">{log.timestamp}</td>
                   <td className="px-6 py-3">{log.id}</td>

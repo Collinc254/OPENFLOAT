@@ -9,6 +9,8 @@ import com.openfloat.middleware.model.MpesaTransaction;
 import com.openfloat.middleware.model.WebhookPayload;
 import com.openfloat.middleware.repository.PaymentReferenceRepository;
 import com.openfloat.middleware.repository.TransactionRepository;
+// ADDED IMPORT
+import com.openfloat.middleware.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -58,6 +60,9 @@ public class StkPushService {
     
     // 1. INJECTED THE REFERENCE REPOSITORY
     private final PaymentReferenceRepository referenceRepository;
+
+    // ADDED NOTIFICATION SERVICE INJECTION
+    private final NotificationService notificationService;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         
@@ -209,7 +214,12 @@ public class StkPushService {
 
                     }, () -> {
                         log.warn("Received successful payment but could not find matching API Gateway reference code: {}", accountReference);
-                        // THE FIX: We no longer send the MpesaTransaction to the queue here.
+                        
+                        // ADDED NOTIFICATION TRIGGER FOR UNKNOWN REFERENCE
+                        notificationService.createAlert(
+                            "UNKNOWN_REFERENCE", 
+                            "Payment received for unregistered reference: " + accountReference + " (Receipt: " + finalReceipt + ")"
+                        );
                     });
                     
                 } else {

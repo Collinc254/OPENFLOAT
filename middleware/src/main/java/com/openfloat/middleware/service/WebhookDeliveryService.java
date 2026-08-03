@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openfloat.middleware.entity.WebhookDeliveryLog;
 import com.openfloat.middleware.model.WebhookPayload;
 import com.openfloat.middleware.repository.WebhookDeliveryLogRepository;
+// ADDED IMPORT
+import com.openfloat.middleware.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -22,6 +24,9 @@ public class WebhookDeliveryService {
     private final WebhookDeliveryLogRepository logRepository;
     private final ObjectMapper objectMapper;
     
+    // ADDED NOTIFICATION SERVICE INJECTION
+    private final NotificationService notificationService;
+    
     // Spring's built-in HTTP client for making external requests
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -33,6 +38,9 @@ public class WebhookDeliveryService {
         deliveryLog.setReferenceCode(payload.getReferenceCode());
         deliveryLog.setClientSystemName(payload.getClientSystemName());
         deliveryLog.setTargetUrl(payload.getTargetUrl());
+
+        // Start timing the HTTP request
+        long startTime = System.currentTimeMillis();
 
         try {
             // 1. Prepare the JSON body
@@ -50,10 +58,11 @@ public class WebhookDeliveryService {
                     String.class
             );
 
-            // 3. Record the exact response
+            // 3. Record the exact response and calculate response time
             deliveryLog.setHttpResponseCode(response.getStatusCode().value());
             deliveryLog.setResponseMessage(response.getBody());
             deliveryLog.setSuccessful(response.getStatusCode().is2xxSuccessful());
+            deliveryLog.setResponseTimeMs(System.currentTimeMillis() - startTime);
 
             logRepository.save(deliveryLog);
 
@@ -64,12 +73,20 @@ public class WebhookDeliveryService {
             }
 
         } catch (Exception e) {
-            // If their server is completely down/timed out, log the error and force a retry
+            // If their server is completely down/timed out, log the error, record time, and force a retry
             deliveryLog.setSuccessful(false);
             deliveryLog.setResponseMessage(e.getMessage());
+            deliveryLog.setResponseTimeMs(System.currentTimeMillis() - startTime);
             logRepository.save(deliveryLog);
             
             log.error("Webhook delivery failed. Throwing exception to trigger RabbitMQ retry.");
+            
+            // ADDED NOTIFICATION TRIGGER FOR FAILED CALLBACK
+            notificationService.createAlert(
+                "FAILED_CALLBACK", 
+                "Webhook delivery failed for client " + payload.getClientSystemName() + ". Error: " + e.getMessage()
+            );
+            
             throw new RuntimeException("Webhook delivery failed: " + e.getMessage());
         }
     }

@@ -3,6 +3,8 @@ package com.openfloat.middleware.controller;
 import com.openfloat.middleware.entity.ClientSystem;
 import com.openfloat.middleware.model.RegisterClientRequest;
 import com.openfloat.middleware.repository.ClientSystemRepository;
+// ADDED IMPORT
+import com.openfloat.middleware.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +21,9 @@ public class ClientSystemController {
 
     private final ClientSystemRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
+    
+    // ADDED NOTIFICATION SERVICE INJECTION
+    private final NotificationService notificationService;
 
     // 1. Register a new Client System
     @PostMapping("/register")
@@ -44,6 +49,12 @@ public class ClientSystemController {
         newClient.setClientSecret(passwordEncoder.encode(rawSecret));
 
         clientRepository.save(newClient);
+
+        // ADDED NOTIFICATION TRIGGER FOR NEW CLIENT REGISTRATION
+        notificationService.createAlert(
+            "NEW_CLIENT", 
+            "A new API client was registered: " + request.getSystemName()
+        );
 
         // Return the RAW secret to the frontend so the Manager can copy it.
         // It will never be visible again after this.
