@@ -34,7 +34,9 @@ public class SystemUser {
     // ==========================================
     // TWO-FACTOR AUTHENTICATION (TOTP)
     // ==========================================
-    @Column(nullable = false)
+    
+    // FIXED: Added columnDefinition to prevent PostgreSQL null constraint errors
+    @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean mfaEnabled = false;
 
