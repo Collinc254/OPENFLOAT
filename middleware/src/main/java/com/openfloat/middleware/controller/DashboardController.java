@@ -28,24 +28,30 @@ public class DashboardController {
     private final ClientSystemRepository clientRepository;
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('STAFF', 'USER', 'OPERATOR', 'MANAGER', 'ADMIN')") // FIXED: Added STAFF and USER roles
+    @PreAuthorize("hasAnyRole('STAFF', 'USER', 'OPERATOR', 'MANAGER', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         List<MpesaTransaction> allTx = transactionRepository.findAll();
         
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIN);
 
+        // =========================================================
+        // FILTER: Isolate ONLY today's transactions for the Dashboard
+        // =========================================================
+        List<MpesaTransaction> dailyTx = allTx.stream()
+                .filter(tx -> tx.getDate() != null && !tx.getDate().isBefore(startOfDay))
+                .collect(Collectors.toList());
+
         // 1. Time-based Payment Counts
-        long paymentsToday = allTx.stream()
-                .filter(tx -> tx.getDate() != null && tx.getDate().isAfter(startOfDay))
-                .count();
+        long paymentsToday = dailyTx.size();
                 
+        // Keep the monthly count pulling from allTx so the "Month: X" stat stays accurate
         long paymentsThisMonth = allTx.stream()
-                .filter(tx -> tx.getDate() != null && tx.getDate().isAfter(startOfMonth))
+                .filter(tx -> tx.getDate() != null && !tx.getDate().isBefore(startOfMonth))
                 .count();
 
-        // 2. Financials (FIXED: Now includes "PAID")
-        BigDecimal totalTransactionValue = allTx.stream()
+        // 2. Financials (Using ONLY today's transactions)
+        BigDecimal totalTransactionValue = dailyTx.stream()
                 .filter(tx -> {
                     String s = tx.getStatus();
                     return "SUCCESS".equals(s) || "COMPLETED".equals(s) || "PAID".equals(s);
@@ -54,30 +60,29 @@ public class DashboardController {
                 .map(MpesaTransaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 3. Callback & System Health (FIXED: Now includes "PAID")
-        long totalProcessed = allTx.size();
-        long successfulCallbacks = allTx.stream().filter(tx -> {
+        // 3. Callback & System Health (Using ONLY today's transactions)
+        long totalProcessed = dailyTx.size();
+        long successfulCallbacks = dailyTx.stream().filter(tx -> {
             String s = tx.getStatus();
             return "SUCCESS".equals(s) || "COMPLETED".equals(s) || "PAID".equals(s);
         }).count();
-        long failedCallbacks = allTx.stream().filter(tx -> "FAILED".equals(tx.getStatus())).count();
+        long failedCallbacks = dailyTx.stream().filter(tx -> "FAILED".equals(tx.getStatus())).count();
         
         double successPercentage = totalProcessed > 0 ? ((double) successfulCallbacks / totalProcessed) * 100 : 0.0;
 
-        // 4. Exceptions & Recon (FIXED: Safely catches nulls as unmatched/pending)
-        long unknownReferences = allTx.stream()
+        // 4. Exceptions & Recon (Using ONLY today's transactions)
+        long unknownReferences = dailyTx.stream()
                 .filter(tx -> tx.getReconciliationStatus() == null || "UNMATCHED".equals(tx.getReconciliationStatus()))
                 .count();
                 
         long pendingReconciliations = unknownReferences;
 
-        // 5. API Gateway Metrics
+        // 5. API Gateway Metrics (Counts systems, not transactions)
         long registeredClients = clientRepository.count();
         long activeApiKeys = clientRepository.findAll().stream().filter(c -> c.isEnabled()).count();
 
-        // 6. Live Activity (Latest 10 transactions for the feed)
-        List<MpesaTransaction> liveActivity = allTx.stream()
-                .filter(tx -> tx.getDate() != null)
+        // 6. Live Activity (Using ONLY today's transactions)
+        List<MpesaTransaction> liveActivity = dailyTx.stream()
                 .sorted((a, b) -> b.getDate().compareTo(a.getDate()))
                 .limit(10)
                 .collect(Collectors.toList());
