@@ -6,7 +6,11 @@ import AdminConsole from './components/AdminConsole';
 import AuditViewer from './components/AuditViewer';
 import Payouts from './components/Payouts'; 
 import ClientManagement from './components/ClientManagement';
-import NotificationBell from './components/NotificationBell'; // Added Import
+import NotificationBell from './components/NotificationBell'; 
+
+// ADDED IMPORTS FOR PROFILE & SECURITY
+import UserProfileDropdown from './components/UserProfileDropdown';
+import UserProfilePage from './components/UserProfilePage'; 
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -34,7 +38,7 @@ export default function App() {
   const isAdmin = user?.role === 'ADMIN';
 
   const handleTabChange = (tab) => {
-    // 1. STRICT STATE GUARD: Prevent unauthorized state changes (Added 'clients' here)
+    // 1. STRICT STATE GUARD
     if ((tab === 'payouts' || tab === 'finance' || tab === 'clients') && !isManagerOrAdmin) {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
@@ -54,7 +58,7 @@ export default function App() {
     return <Login onSuccessfulLogin={handleLoginSuccess} />;
   }
 
-  // 2. FALLBACK COMPONENT: If a user breaks the state, show this instead of a blank screen
+  // 2. FALLBACK COMPONENT
   const UnauthorizedAccess = () => (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
       <div className="bg-red-50 p-6 rounded-full mb-4 border-8 border-red-100">
@@ -139,7 +143,6 @@ export default function App() {
                   </button>
                 </li>
                 
-                {/* 2. Added API Gateway Button */}
                 <li>
                   <button 
                     onClick={() => handleTabChange('clients')}
@@ -215,7 +218,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col h-screen overflow-x-hidden relative">
         
-        {/* UPDATED HEADER: flex-justify-between and added the NotificationBell */}
+        {/* UPDATED HEADER */}
         <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between shadow-sm z-10 h-20 shrink-0">
           <div className="flex items-center">
             <button 
@@ -227,18 +230,23 @@ export default function App() {
               </svg>
             </button>
 
-            {/* 3. Updated Dynamic Header Title */}
+            {/* Dynamic Header Title including Profile */}
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
               {activeTab === 'finance' ? 'Finance & Reconciliation' : 
                activeTab === 'payouts' ? 'Payouts' : 
                activeTab === 'clients' ? 'API Gateway' :
+               activeTab === 'profile' ? 'Profile & Security' :
                `${activeTab} Dashboard`}
             </h2>
           </div>
 
-          {/* ADDED NOTIFICATION BELL HERE */}
+          {/* ADDED PROFILE DROPDOWN NEXT TO NOTIFICATION BELL */}
           <div className="flex items-center gap-4">
             <NotificationBell token={user.token} />
+            <UserProfileDropdown 
+              onNavigate={() => handleTabChange('profile')} 
+              onLogout={handleLogout} 
+            />
           </div>
         </header>
         
@@ -249,7 +257,8 @@ export default function App() {
             <div className="p-4 md:p-8 h-full overflow-y-auto">
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
                 
-                {/* 4. Added ClientManagement Route */}
+                {/* RENDER THE CORRECT TAB BASED ON STATE */}
+                {activeTab === 'profile' && <UserProfilePage />}
                 {activeTab === 'payouts' && (isManagerOrAdmin ? <Payouts /> : <UnauthorizedAccess />)}
                 {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
                 {activeTab === 'clients' && (isManagerOrAdmin ? <ClientManagement /> : <UnauthorizedAccess />)}
