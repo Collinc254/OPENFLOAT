@@ -1,5 +1,6 @@
 package com.openfloat.middleware.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -64,8 +65,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
+        } catch (ExpiredJwtException e) {
+            // Catches standard expirations quietly so they don't spam the server logs. 
+            // The frontend API wrapper will catch the resulting 401 and refresh the token automatically.
+            logger.debug("JWT expired quietly handled: " + e.getMessage());
         } catch (Exception e) {
-            // Catches malformed or expired JWTs gracefully without throwing 500
+            // Logs actual security threats like malformed or tampered JWTs
             logger.warn("JWT authentication failed: " + e.getMessage());
         }
 
