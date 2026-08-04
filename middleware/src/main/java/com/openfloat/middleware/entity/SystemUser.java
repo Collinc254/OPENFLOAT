@@ -26,8 +26,18 @@ public class SystemUser {
     @Column(nullable = false)
     private Role role; 
 
-    // NEW: Controls whether the user is active or disabled. Default is true.
+    // Controls whether the user is active or disabled. Default is true.
     @Column(nullable = false)
     @Builder.Default
     private boolean enabled = true; 
+
+    // ==========================================
+    // TWO-FACTOR AUTHENTICATION (TOTP)
+    // ==========================================
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean mfaEnabled = false;
+
+    @Column
+    private String mfaSecret; // Stores the secure key for Google Authenticator
 }
