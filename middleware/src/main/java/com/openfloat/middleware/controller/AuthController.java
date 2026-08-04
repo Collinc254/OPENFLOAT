@@ -65,8 +65,8 @@ public class AuthController {
         SystemUser user = userRepository.findByUsername(authRequest.username())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if Two-Factor Authentication is enabled for this account
-        if (user.isMfaEnabled()) {
+        // ENFORCED RULE: Check if user is an ADMIN AND has Two-Factor Authentication enabled
+        if ("ADMIN".equals(user.getRole().name()) && user.isMfaEnabled()) {
             String code = authRequest.code();
             if (code == null || code.isBlank() || !codeVerifier.isValidCode(user.getMfaSecret(), code)) {
                 return ResponseEntity.status(401).body(Map.of(
