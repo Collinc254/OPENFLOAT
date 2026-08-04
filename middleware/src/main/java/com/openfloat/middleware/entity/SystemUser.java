@@ -35,11 +35,16 @@ public class SystemUser {
     // TWO-FACTOR AUTHENTICATION (TOTP)
     // ==========================================
     
-    // FIXED: Added columnDefinition to prevent PostgreSQL null constraint errors
-    @Column(nullable = false, columnDefinition = "boolean default false")
-    @Builder.Default
-    private boolean mfaEnabled = false;
+    // FIX: Using Object Boolean and removing NOT NULL so PostgreSQL allows the migration
+    @Column(name = "mfa_enabled")
+    private Boolean mfaEnabled;
 
     @Column
-    private String mfaSecret; // Stores the secure key for Google Authenticator
+    private String mfaSecret; 
+
+    // Custom getter safely handles legacy database rows that have 'null'
+    // This keeps AuthController.java perfectly happy!
+    public boolean isMfaEnabled() {
+        return mfaEnabled != null && mfaEnabled;
+    }
 }
