@@ -12,12 +12,12 @@ export default function Login({ onSuccessfulLogin }) {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      // Send real credentials to your Spring Boot backend
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // CRITICAL: Allows the browser to accept the HttpOnly cookie
         body: JSON.stringify({ username, password }),
       });
 
@@ -25,23 +25,23 @@ export default function Login({ onSuccessfulLogin }) {
         throw new Error('Authentication failed');
       }
 
-      // Extract the JWT token AND the dynamic role from the new backend response
       const data = await response.json();
 
-      // Save BOTH to the browser's local storage
+      // Only save the short-lived access token and role to local storage
       localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role); // Captures STAFF, MANAGER, or ADMIN
+      localStorage.setItem('role', data.role);
 
-      // Pass the real, dynamic data to the main app layout
+      // The browser has already intercepted the HttpOnly cookie and saved it safely in the background!
+
       onSuccessfulLogin({
         username: username,
-        role: data.role, // No longer hardcoded
+        role: data.role, 
         token: data.token
       });
 
     } catch (error) {
       console.error('Login Error:', error);
-      setStatus('error'); // Triggers the red error banner
+      setStatus('error'); 
     }
   };
 

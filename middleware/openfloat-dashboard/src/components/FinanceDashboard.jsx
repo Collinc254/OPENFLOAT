@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import fetchWithAuth from './api'; // Adjust this path if necessary
 
 export default function FinanceDashboard({ token }) {
   // View state
@@ -74,7 +75,8 @@ export default function FinanceDashboard({ token }) {
         ? `${API_URL}/api/v1/transactions/filter?${queryString}` 
         : `${API_URL}/api/v1/payments`;
       
-      const response = await fetch(endpoint, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(endpoint, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
@@ -120,7 +122,9 @@ export default function FinanceDashboard({ token }) {
 
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
-      const response = await fetch(`${API_URL}/api/v1/payments/resolve`, {
+      
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_URL}/api/v1/payments/resolve`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -165,7 +169,8 @@ export default function FinanceDashboard({ token }) {
       const formData = new FormData();
       formData.append('providerFile', auditFile);
 
-      const response = await fetch(`${API_URL}/api/v1/reconciliation/audit`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_URL}/api/v1/reconciliation/audit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -194,7 +199,8 @@ export default function FinanceDashboard({ token }) {
         ? `${API_URL}/api/v1/reports/transactions/excel`
         : `${API_URL}/api/v1/reports/transactions/pdf`;
       
-      const response = await fetch(endpoint, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(endpoint, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });

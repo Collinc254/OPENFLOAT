@@ -2,7 +2,6 @@ package com.openfloat.middleware.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -17,8 +16,11 @@ public class JwtUtil {
     // 1. FIXED STATIC KEY: This is over 256-bits long and will NEVER change.
     private static final String SECRET_KEY_STRING = "OpenFloatEnterpriseSecureSecretKey2026!@#$%^&*()";
 
-    // Tokens will expire after 10 hours
-    private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 10;
+    // Access tokens now expire in 15 minutes (Secure standard)
+    private static final long EXPIRATION_TIME = 1000 * 60 * 15;
+    
+    // Refresh tokens expire in 7 days (Allows users to stay logged in without re-typing passwords)
+    private static final long REFRESH_EXPIRATION_TIME = 1000L * 60 * 60 * 24 * 7;
 
     // 2. HELPER METHOD: Converts the static string into a signing key
     private Key getSignInKey() {
@@ -30,7 +32,17 @@ public class JwtUtil {
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(getSignInKey()) // Uses the permanent static key
+                .signWith(getSignInKey()) 
+                .compact();
+    }
+
+    // 3. NEW METHOD: Generates the long-lived refresh token
+    public String generateRefreshToken(UserDetails userDetails) {
+        return Jwts.builder()
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION_TIME))
+                .signWith(getSignInKey()) 
                 .compact();
     }
 

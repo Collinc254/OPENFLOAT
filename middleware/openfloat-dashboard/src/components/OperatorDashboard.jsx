@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import fetchWithAuth from './api'; // Adjust this path if you save api.js in a different folder (e.g., '../utils/api')
 
 export default function OperatorDashboard() {
   // ==========================================
@@ -13,7 +14,8 @@ export default function OperatorDashboard() {
       const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      const response = await fetch(`${API_URL}/api/v1/dashboard/stats`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_URL}/api/v1/dashboard/stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -135,7 +137,8 @@ export default function OperatorDashboard() {
       pollInterval = setInterval(() => {
         const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
 
-        fetch(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`, {
+        // SWAPPED: fetch -> fetchWithAuth
+        fetchWithAuth(`${API_BASE_URL}/api/v1/payments/status/${activeTxRef}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
           .then((res) => {
@@ -212,7 +215,8 @@ export default function OperatorDashboard() {
       if (processingMode === 'single') {
         const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('openfloat_user'))?.token;
 
-        const response = await fetch(`${API_BASE_URL}/api/v1/payments/stk-push`, {
+        // SWAPPED: fetch -> fetchWithAuth
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/payments/stk-push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
