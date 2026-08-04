@@ -8,8 +8,8 @@ const fetchWithAuth = async (url, options = {}) => {
   // 2. Make the initial request
   let response = await fetch(url, fetchOptions);
 
-  // 3. Catch the exact moment the access token expires
-  if (response.status === 401) {
+  // 3. Catch the exact moment the access token expires (handles both 401 and 403)
+  if (response.status === 401 || response.status === 403) {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       

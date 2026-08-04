@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import fetchWithAuth from './api'; // Adjust this path if necessary based on your folder structure
 
 export default function ClientManagement() {
   // --- TAB STATE ---
@@ -26,7 +27,8 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/clients`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -48,7 +50,8 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/webhooks/logs`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/webhooks/logs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -82,7 +85,8 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/clients/register`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +128,8 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clientId}/toggle-status`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients/${clientId}/toggle-status`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -146,7 +151,8 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/webhooks/${logId}/resend`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/webhooks/${logId}/resend`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
