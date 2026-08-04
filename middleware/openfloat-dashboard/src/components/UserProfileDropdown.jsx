@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 
-// Notice we accept onNavigate and onLogout as props now
-export default function UserProfileDropdown({ onNavigate, onLogout }) {
+// Notice we now accept 'user' as a prop
+export default function UserProfileDropdown({ user, onNavigate, onLogout }) {
   const [isOpen, setIsOpen] = useState(false);
-  const username = localStorage.getItem('openfloat_user') || 'Collins';
+
+  // Safely grab the username and check if they are an ADMIN
+  const username = user?.username || 'User';
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <div className="relative">
@@ -23,19 +26,24 @@ export default function UserProfileDropdown({ onNavigate, onLogout }) {
         <div className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-lg border border-slate-200 p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="px-4 py-3 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">{username}</p>
-            <p className="text-xs text-slate-500">nduchezcollins@gmail.com</p>
+            <p className="text-xs text-slate-500">{user?.role} Account</p>
           </div>
           <div className="py-2">
-            <button
-              onClick={() => {
-                onNavigate();
-                setIsOpen(false);
-              }}
-              className="w-full text-left flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-              Profile & Security
-            </button>
+            
+            {/* SECURITY CHECK: Only render this button if the user is an ADMIN */}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  onNavigate();
+                  setIsOpen(false);
+                }}
+                className="w-full text-left flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                Profile & Security
+              </button>
+            )}
+
             <button
               onClick={onLogout}
               className="w-full text-left flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"

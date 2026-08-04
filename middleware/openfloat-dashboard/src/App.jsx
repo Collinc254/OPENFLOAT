@@ -43,7 +43,8 @@ export default function App() {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
     }
-    if ((tab === 'admin' || tab === 'viewer') && !isAdmin) {
+    // SECURED: Added 'profile' to the strict Admin-only check
+    if ((tab === 'admin' || tab === 'viewer' || tab === 'profile') && !isAdmin) {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
     }
@@ -243,7 +244,10 @@ export default function App() {
           {/* ADDED PROFILE DROPDOWN NEXT TO NOTIFICATION BELL */}
           <div className="flex items-center gap-4">
             <NotificationBell token={user.token} />
+            
+            {/* SECURED: Passing the user prop down to the dropdown component */}
             <UserProfileDropdown 
+              user={user} 
               onNavigate={() => handleTabChange('profile')} 
               onLogout={handleLogout} 
             />
@@ -257,8 +261,8 @@ export default function App() {
             <div className="p-4 md:p-8 h-full overflow-y-auto">
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
                 
-                {/* RENDER THE CORRECT TAB BASED ON STATE */}
-                {activeTab === 'profile' && <UserProfilePage />}
+                {/* SECURED: Only Admins can render the UserProfilePage. Others get UnauthorizedAccess */}
+                {activeTab === 'profile' && (isAdmin ? <UserProfilePage /> : <UnauthorizedAccess />)}
                 {activeTab === 'payouts' && (isManagerOrAdmin ? <Payouts /> : <UnauthorizedAccess />)}
                 {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
                 {activeTab === 'clients' && (isManagerOrAdmin ? <ClientManagement /> : <UnauthorizedAccess />)}
