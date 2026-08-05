@@ -35,9 +35,10 @@ public class SystemUser {
     // TWO-FACTOR AUTHENTICATION (TOTP)
     // ==========================================
     
-    // FIX: Using Object Boolean and removing NOT NULL so PostgreSQL allows the migration
+    // FIX: Added @Builder.Default and = false to prevent Lombok from sending nulls during registration
     @Column(name = "mfa_enabled")
-    private Boolean mfaEnabled;
+    @Builder.Default
+    private Boolean mfaEnabled = false;
 
     @Column
     private String mfaSecret; 

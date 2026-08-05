@@ -38,6 +38,9 @@ public class UserController {
         
         newUser.setRole(request.getRole());
 
+        // FIX: Explicitly set MFA to false for new users to satisfy PostgreSQL's NOT NULL constraint
+        newUser.setMfaEnabled(false);
+
         // 3. Save to PostgreSQL
         userRepository.save(newUser);
 
@@ -53,7 +56,8 @@ public class UserController {
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "role", user.getRole().name(),
-                "enabled", user.isEnabled()
+                "enabled", user.isEnabled(),
+                "mfaEnabled", user.isMfaEnabled() // Expose MFA status to the React Admin Console
         )).toList();
         
         return ResponseEntity.ok(users);
