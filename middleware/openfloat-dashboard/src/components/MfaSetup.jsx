@@ -8,8 +8,14 @@ export default function MfaSetup() {
   const [verificationCode, setVerificationCode] = useState('');
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
 
-  // Assuming you store the username in localStorage upon login
-  const username = localStorage.getItem('openfloat_user') || 'admin'; 
+  // Safely parse the username for API calls
+  let username = 'admin'; 
+  try {
+    const savedUser = JSON.parse(localStorage.getItem('openfloat_user'));
+    username = savedUser?.username || 'admin';
+  } catch (e) {
+    username = localStorage.getItem('openfloat_user') || 'admin';
+  }
 
   const handleStartSetup = async () => {
     setStep('scanning');
