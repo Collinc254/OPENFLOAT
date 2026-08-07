@@ -26,10 +26,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -80,7 +83,20 @@ public class AuthController {
         final String accessToken = jwtUtil.generateToken(userDetails);
         final String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
-        String role = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+        // FIX: Properly separate base role from granular permissions
+        List<String> allAuthorities = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        String baseRole = allAuthorities.stream()
+                .filter(auth -> auth.equals("ADMIN") || auth.equals("MANAGER") || auth.equals("STAFF") || auth.startsWith("ROLE_"))
+                .findFirst()
+                .map(role -> role.replace("ROLE_", ""))
+                .orElse("STAFF");
+
+        List<String> granularPermissions = allAuthorities.stream()
+                .filter(auth -> !auth.equals("ADMIN") && !auth.equals("MANAGER") && !auth.equals("STAFF") && !auth.startsWith("ROLE_"))
+                .collect(Collectors.toList());
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
@@ -92,7 +108,7 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                .body(new AuthResponse(accessToken, role));
+                .body(new AuthResponse(accessToken, baseRole, granularPermissions));
     }
 
     // ==========================================
@@ -164,9 +180,23 @@ public class AuthController {
 
                 if (jwtUtil.isTokenValid(refreshToken, userDetails)) {
                     String newAccessToken = jwtUtil.generateToken(userDetails);
-                    String role = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+                    
+                    // FIX: Also apply proper role extraction here
+                    List<String> allAuthorities = userDetails.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .collect(Collectors.toList());
 
-                    return ResponseEntity.ok(new AuthResponse(newAccessToken, role));
+                    String baseRole = allAuthorities.stream()
+                            .filter(auth -> auth.equals("ADMIN") || auth.equals("MANAGER") || auth.equals("STAFF") || auth.startsWith("ROLE_"))
+                            .findFirst()
+                            .map(role -> role.replace("ROLE_", ""))
+                            .orElse("STAFF");
+
+                    List<String> granularPermissions = allAuthorities.stream()
+                            .filter(auth -> !auth.equals("ADMIN") && !auth.equals("MANAGER") && !auth.equals("STAFF") && !auth.startsWith("ROLE_"))
+                            .collect(Collectors.toList());
+
+                    return ResponseEntity.ok(new AuthResponse(newAccessToken, baseRole, granularPermissions));
                 }
             }
         } catch (Exception e) {
@@ -180,4 +210,5 @@ public class AuthController {
 // Data Transfer Objects
 record AuthRequest(String username, String password, String code) {}
 record EnableMfaRequest(String username, String secret, String code) {}
-record AuthResponse(String token, String role) {}
+// FIX: Added the List of permissions to the AuthResponse
+record AuthResponse(String token, String role, List<String> permissions) {}
