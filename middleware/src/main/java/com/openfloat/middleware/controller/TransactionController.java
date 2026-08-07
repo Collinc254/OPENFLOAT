@@ -5,6 +5,7 @@ import com.openfloat.middleware.repository.TransactionRepository;
 import com.openfloat.middleware.service.TransactionQueryService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ public class TransactionController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
     public ResponseEntity<List<MpesaTransaction>> getAllTransactions() {
         List<MpesaTransaction> transactions = transactionRepository.findAllByOrderByDateDesc();
         return ResponseEntity.ok(transactions);
@@ -33,6 +35,7 @@ public class TransactionController {
     // NEW: ADMIN DASHBOARD FILTERING ENDPOINT
     // ==========================================
     @GetMapping("/filter")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
     public ResponseEntity<List<MpesaTransaction>> filterTransactions(
             @RequestParam(required = false) String clientSystemName,
             @RequestParam(required = false) Double minAmount,
@@ -52,6 +55,7 @@ public class TransactionController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
     public ResponseEntity<MpesaTransaction> getTransactionById(@PathVariable String id) {
         return transactionRepository.findById(id)
             .map(ResponseEntity::ok)

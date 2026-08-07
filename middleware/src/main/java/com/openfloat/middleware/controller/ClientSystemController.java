@@ -27,7 +27,7 @@ public class ClientSystemController {
 
     // 1. Register a new Client System
     @PostMapping("/register")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('MANAGE_CLIENT_SYSTEMS')")
     public ResponseEntity<?> registerClient(@RequestBody RegisterClientRequest request) {
         
         if (clientRepository.existsBySystemName(request.getSystemName())) {
@@ -68,7 +68,7 @@ public class ClientSystemController {
 
     // 2. Fetch all registered systems (hiding secrets)
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('MANAGE_CLIENT_SYSTEMS')")
     public ResponseEntity<?> getAllClients() {
         var clients = clientRepository.findAll().stream().map(client -> Map.of(
                 "id", client.getId(),
@@ -84,7 +84,7 @@ public class ClientSystemController {
 
     // 3. Toggle Client System Access
     @PutMapping("/{id}/toggle-status")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('MANAGE_CLIENT_SYSTEMS')")
     public ResponseEntity<?> toggleClientStatus(@PathVariable Long id) {
         ClientSystem client = clientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Client system not found"));

@@ -11,6 +11,7 @@ import com.openfloat.middleware.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,17 +35,20 @@ public class PaymentController {
     private final AuditLogService auditLogService; // Injected AuditLogService for SIEM trails
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
     public ResponseEntity<?> getAllTransactions() {
         log.info("Frontend requested live database transactions.");
         return ResponseEntity.ok(transactionRepository.findAll());
     }
 
     @PostMapping(value = {"/trigger", "/stk-push"})
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('INITIATE_STK_PUSH')")
     public ResponseEntity<DarajaStkPushResponse> triggerStkPush(@RequestBody StkPushRequest request) {
         DarajaStkPushResponse response = stkPushService.sendPush(request);
         return ResponseEntity.ok(response);
     }
 
+    // OPEN CALLBACK: Safaricom hits this, do not protect with @PreAuthorize
     @PostMapping("/callback")
     public ResponseEntity<String> handleCallback(@RequestBody String rawJson) {
         log.info("Controller received incoming payload at /api/v1/payments/callback");
@@ -53,6 +57,7 @@ public class PaymentController {
     }
 
     @GetMapping("/status/{checkoutRequestId}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
     public ResponseEntity<?> getTransactionStatus(@PathVariable String checkoutRequestId) {
         Optional<MpesaTransaction> transaction = transactionRepository.findByCheckoutRequestId(checkoutRequestId);
 
@@ -68,6 +73,7 @@ public class PaymentController {
     }
 
     @PostMapping("/resolve")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('EXECUTE_RECONCILIATION')")
     public ResponseEntity<?> resolveUnknownTransaction(@RequestBody ResolveTransactionRequest request) {
         log.info("Admin initiated manual resolution for transaction ID: {}", request.id());
 

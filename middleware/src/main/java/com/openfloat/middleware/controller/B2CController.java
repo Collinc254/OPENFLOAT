@@ -7,6 +7,7 @@ import com.openfloat.middleware.service.B2CService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -16,13 +17,13 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class B2CController {
    
-
-
     private final B2CService b2cService;
     private final B2CTransactionRepository transactionRepository;
     private final ObjectMapper objectMapper;
 
+    // SECURED: Only Admins or users with specific Payout creation rights can trigger this
     @PostMapping("/simulate")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CREATE_PAYOUT')")
     public ResponseEntity<String> simulateB2C(@RequestParam String phoneNumber, @RequestParam String amount) {
         log.info("Simulating B2C payment to {} for amount {}", phoneNumber, amount);
         
@@ -35,6 +36,7 @@ public class B2CController {
         return ResponseEntity.ok(response);
     }
 
+    // OPEN CALLBACK: Safaricom hits this, do not protect with @PreAuthorize
     @PostMapping("/result")
     public ResponseEntity<String> handleB2CResult(@RequestBody String payload) {
         log.info("Safaricom B2C Result Callback Received: {}", payload);
@@ -72,6 +74,7 @@ public class B2CController {
         return ResponseEntity.ok("{\"ResultCode\": 0, \"ResultDesc\": \"Accepted\"}");
     }
 
+    // OPEN CALLBACK: Safaricom hits this, do not protect with @PreAuthorize
     @PostMapping("/timeout")
     public ResponseEntity<String> handleB2CTimeout(@RequestBody String payload) {
         log.warn("Safaricom B2C Timeout Callback Received: {}", payload);

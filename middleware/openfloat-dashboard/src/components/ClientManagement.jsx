@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import fetchWithAuth from './api'; // Adjust this path if necessary based on your folder structure
 
-export default function ClientManagement() {
+export default function ClientManagement({ user }) {
+  // === GRANULAR PERMISSION CHECKS ===
+  const currentUser = user || JSON.parse(localStorage.getItem('openfloat_user') || '{}');
+  const permissions = currentUser?.permissions || [];
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const canManageClients = isAdmin || permissions.includes('MANAGE_CLIENT_SYSTEMS');
+
   // --- TAB STATE ---
   const [activeTab, setActiveTab] = useState('systems');
 
@@ -27,7 +33,6 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -50,7 +55,6 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/webhooks/logs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -85,7 +89,6 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients/register`, {
         method: 'POST',
         headers: {
@@ -128,7 +131,6 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/clients/${clientId}/toggle-status`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -151,7 +153,6 @@ export default function ClientManagement() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/webhooks/${logId}/resend`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -201,68 +202,77 @@ export default function ClientManagement() {
       {activeTab === 'systems' && (
         <div className="space-y-6 animate-in fade-in duration-300">
           
-          {/* Registration Card */}
+          {/* Registration Card - SECURED */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
               
               {/* Form */}
               <div>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-5 border-b pb-2">New System Details</h3>
-                <form onSubmit={handleRegisterClient} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">System Name</label>
-                    <input 
-                      type="text" 
-                      value={systemName} 
-                      onChange={(e) => setSystemName(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
-                      placeholder="e.g. ERP Accounting Module"
-                      required 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Webhook URL</label>
-                    <input 
-                      type="url" 
-                      value={webhookUrl} 
-                      onChange={(e) => setWebhookUrl(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
-                      placeholder="https://their-system.com/api/callback"
-                      required 
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Rate Limit (Req/Min)</label>
-                    <input 
-                      type="number" 
-                      min="10"
-                      max="1000"
-                      value={rateLimit} 
-                      onChange={(e) => setRateLimit(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
-                      required 
-                    />
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-2"
-                  >
-                    Generate API Credentials
-                  </button>
-
-                  {statusMessage.text && (
-                    <div className={`p-3 rounded-lg text-sm font-medium text-center ${
-                      statusMessage.type === 'error' ? 'bg-red-50 text-red-700' : 
-                      statusMessage.type === 'success' ? 'bg-green-50 text-green-700' : 
-                      'bg-blue-50 text-blue-700'
-                    }`}>
-                      {statusMessage.text}
+                
+                {canManageClients ? (
+                  <form onSubmit={handleRegisterClient} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">System Name</label>
+                      <input 
+                        type="text" 
+                        value={systemName} 
+                        onChange={(e) => setSystemName(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
+                        placeholder="e.g. ERP Accounting Module"
+                        required 
+                      />
                     </div>
-                  )}
-                </form>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Webhook URL</label>
+                      <input 
+                        type="url" 
+                        value={webhookUrl} 
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
+                        placeholder="https://their-system.com/api/callback"
+                        required 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Rate Limit (Req/Min)</label>
+                      <input 
+                        type="number" 
+                        min="10"
+                        max="1000"
+                        value={rateLimit} 
+                        onChange={(e) => setRateLimit(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700"
+                        required 
+                      />
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-2"
+                    >
+                      Generate API Credentials
+                    </button>
+
+                    {statusMessage.text && (
+                      <div className={`p-3 rounded-lg text-sm font-medium text-center ${
+                        statusMessage.type === 'error' ? 'bg-red-50 text-red-700' : 
+                        statusMessage.type === 'success' ? 'bg-green-50 text-green-700' : 
+                        'bg-blue-50 text-blue-700'
+                      }`}>
+                        {statusMessage.text}
+                      </div>
+                    )}
+                  </form>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-8 text-center flex flex-col items-center justify-center h-full min-h-[250px]">
+                    <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <p className="text-sm font-semibold text-slate-700">Creation Restricted</p>
+                    <p className="text-xs text-slate-500 mt-1">You require the MANAGE_CLIENT_SYSTEMS permission to generate API keys.</p>
+                  </div>
+                )}
               </div>
 
               {/* Secure Credentials Display */}
@@ -332,16 +342,21 @@ export default function ClientManagement() {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-sm text-right">
-                          <button
-                            onClick={() => handleToggleStatus(client.id)}
-                            className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
-                              client.enabled 
-                              ? 'border-red-200 text-red-600 hover:bg-red-50' 
-                              : 'border-green-200 text-green-600 hover:bg-green-50'
-                            }`}
-                          >
-                            {client.enabled ? 'Suspend' : 'Activate'}
-                          </button>
+                          {/* SECURED: Hide manual status toggle for unauthorized users */}
+                          {canManageClients ? (
+                            <button
+                              onClick={() => handleToggleStatus(client.id)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
+                                client.enabled 
+                                ? 'border-red-200 text-red-600 hover:bg-red-50' 
+                                : 'border-green-200 text-green-600 hover:bg-green-50'
+                              }`}
+                            >
+                              {client.enabled ? 'Suspend' : 'Activate'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium border border-slate-200 px-2 py-1.5 rounded bg-slate-50">Restricted</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -424,7 +439,9 @@ export default function ClientManagement() {
                           >
                             {expandedLogId === log.id ? 'Close' : 'View Data'}
                           </button>
-                          {!log.successful && (
+                          
+                          {/* SECURED: Hide manual resend for unauthorized users */}
+                          {!log.successful && canManageClients && (
                             <button 
                               onClick={() => handleResendWebhook(log.id)}
                               disabled={resendingId === log.id}

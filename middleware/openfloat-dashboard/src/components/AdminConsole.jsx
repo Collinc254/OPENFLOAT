@@ -1,4 +1,19 @@
 import { useState, useEffect } from 'react';
+import fetchWithAuth from './api'; // ADDED: Standardized API wrapper
+
+// Master list of system permissions based on backend Enum
+const AVAILABLE_PERMISSIONS = [
+  { id: 'READ_TRANSACTIONS', label: 'View Transactions' },
+  { id: 'INITIATE_STK_PUSH', label: 'Initiate STK Push' },
+  { id: 'PROCESS_REFUNDS', label: 'Process Refunds' },
+  { id: 'CREATE_PAYOUT', label: 'Create Payout Drafts' },
+  { id: 'APPROVE_PAYOUT', label: 'Approve Payouts' },
+  { id: 'VIEW_FINANCE_REPORTS', label: 'View Finance Reports' },
+  { id: 'EXECUTE_RECONCILIATION', label: 'Execute Reconciliation' },
+  { id: 'MANAGE_CLIENT_SYSTEMS', label: 'Manage Client Systems' },
+  { id: 'MANAGE_API_KEYS', label: 'Manage API Keys' },
+  { id: 'VIEW_AUDIT_LOGS', label: 'View Audit Logs' }
+];
 
 export default function AdminConsole() {
   // Existing API Key State
@@ -11,18 +26,24 @@ export default function AdminConsole() {
   const [selectedRole, setSelectedRole] = useState('STAFF'); 
   const [creationStatus, setCreationStatus] = useState('');
 
-  // NEW: User List State
+  // User List State
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  // NEW: Fetch all users on component mount
+  // Permissions Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [checkedPermissions, setCheckedPermissions] = useState([]);
+  const [updatingPermissions, setUpdatingPermissions] = useState(false);
+
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/users`, {
         headers: {
           'Authorization': `Bearer ${token}` 
         }
@@ -43,6 +64,7 @@ export default function AdminConsole() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleKeyRotation = (e) => {
@@ -50,7 +72,6 @@ export default function AdminConsole() {
     setRotating(true);
     setMessage('');
 
-    // Simulate API call to Secrets Manager
     setTimeout(() => {
       setRotating(false);
       setMessage('Consumer Key & Secret successfully rotated and synced with Safaricom.');
@@ -65,7 +86,8 @@ export default function AdminConsole() {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/register`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,7 +108,6 @@ export default function AdminConsole() {
       setNewUsername('');
       setNewPassword('');
       
-      // NEW: Refresh the table immediately after creating a user
       fetchUsers();
       
     } catch (error) {
@@ -95,13 +116,13 @@ export default function AdminConsole() {
     }
   };
 
-  // NEW: Handle activating/deactivating a user
   const handleToggleStatus = async (userId) => {
     try {
       const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/toggle-status`, {
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/users/${userId}/toggle-status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}` 
@@ -109,7 +130,6 @@ export default function AdminConsole() {
       });
 
       if (response.ok) {
-        // Refresh the table to show the new status
         fetchUsers();
       } else {
         const errData = await response.json();
@@ -121,8 +141,62 @@ export default function AdminConsole() {
     }
   };
 
+  const openPermissionsModal = (user) => {
+    setEditingUser(user);
+    // Initialize checkboxes with the user's existing permissions from the backend
+    setCheckedPermissions(user.permissions || []);
+    setIsModalOpen(true);
+  };
+
+  const closePermissionsModal = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+    setCheckedPermissions([]);
+  };
+
+  const togglePermission = (permissionId) => {
+    setCheckedPermissions((prev) => 
+      prev.includes(permissionId) 
+        ? prev.filter(p => p !== permissionId) 
+        : [...prev, permissionId]
+    );
+  };
+
+  const handleSavePermissions = async () => {
+    setUpdatingPermissions(true);
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+
+      // SWAPPED: fetch -> fetchWithAuth
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/users/${editingUser.id}/permissions`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({
+          permissions: checkedPermissions
+        }),
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        closePermissionsModal();
+      } else {
+        const errData = await response.json();
+        alert(errData.error || 'Failed to update permissions.');
+      }
+    } catch (error) {
+      console.error('Error saving permissions:', error);
+      alert('Network error connecting to the server.');
+    } finally {
+      setUpdatingPermissions(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       
       {/* API Configuration Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -236,7 +310,6 @@ export default function AdminConsole() {
             )}
           </form>
 
-          {/* NEW: Active System Users Data Table */}
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-5 border-b pb-2">Active System Users</h3>
           <div className="overflow-x-auto">
             {loadingUsers ? (
@@ -272,16 +345,26 @@ export default function AdminConsole() {
                       </td>
                       <td className="py-3 px-4 text-sm text-right">
                         {user.role !== 'ADMIN' ? (
-                          <button
-                            onClick={() => handleToggleStatus(user.id)}
-                            className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
-                              user.enabled 
-                              ? 'border-red-200 text-red-600 hover:bg-red-50' 
-                              : 'border-green-200 text-green-600 hover:bg-green-50'
-                            }`}
-                          >
-                            {user.enabled ? 'Deactivate' : 'Activate'}
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            {/* Edit Permissions Button */}
+                            <button
+                              onClick={() => openPermissionsModal(user)}
+                              className="px-3 py-1.5 rounded text-xs font-bold transition-colors border border-blue-200 text-blue-600 hover:bg-blue-50"
+                            >
+                              Permissions
+                            </button>
+                            {/* Activate/Deactivate Button */}
+                            <button
+                              onClick={() => handleToggleStatus(user.id)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold transition-colors border ${
+                                user.enabled 
+                                ? 'border-red-200 text-red-600 hover:bg-red-50' 
+                                : 'border-green-200 text-green-600 hover:bg-green-50'
+                              }`}
+                            >
+                              {user.enabled ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400 font-medium italic pr-2">Protected</span>
                         )}
@@ -299,6 +382,77 @@ export default function AdminConsole() {
           </div>
         </div>
       </div>
+
+      {/* Permissions Modal Overlay */}
+      {isModalOpen && editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Edit Permissions</h3>
+                <p className="text-xs text-slate-500 font-medium">Managing access for <span className="text-slate-800 font-bold">{editingUser.username}</span></p>
+              </div>
+              <button 
+                onClick={closePermissionsModal}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+
+            {/* Modal Body: Checkbox List */}
+            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-3">
+              {AVAILABLE_PERMISSIONS.map((perm) => (
+                <label 
+                  key={perm.id} 
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    checkedPermissions.includes(perm.id) 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center h-5">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-green-600 bg-slate-100 border-slate-300 rounded focus:ring-green-500"
+                      checked={checkedPermissions.includes(perm.id)}
+                      onChange={() => togglePermission(perm.id)}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-sm font-bold ${checkedPermissions.includes(perm.id) ? 'text-green-800' : 'text-slate-700'}`}>
+                      {perm.label}
+                    </span>
+                    <span className="text-xs text-slate-500 font-mono mt-0.5">{perm.id}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 rounded-b-xl bg-slate-50">
+              <button 
+                onClick={closePermissionsModal}
+                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSavePermissions}
+                disabled={updatingPermissions}
+                className={`px-6 py-2 text-sm font-bold text-white rounded-lg transition-colors shadow-sm ${
+                  updatingPermissions ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {updatingPermissions ? 'Saving...' : 'Apply Permissions'}
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      )}
 
     </div>
   );

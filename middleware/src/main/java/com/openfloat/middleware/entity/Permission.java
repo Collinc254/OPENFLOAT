@@ -1,0 +1,14 @@
+package com.openfloat.middleware.entity;
+
+public enum Permission {
+    READ_TRANSACTIONS,
+    INITIATE_STK_PUSH,
+    PROCESS_REFUNDS,
+    CREATE_PAYOUT,
+    APPROVE_PAYOUT,
+    VIEW_FINANCE_REPORTS,
+    EXECUTE_RECONCILIATION,
+    MANAGE_CLIENT_SYSTEMS,
+    MANAGE_API_KEYS,
+    VIEW_AUDIT_LOGS
+}

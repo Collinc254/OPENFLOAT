@@ -22,7 +22,7 @@ public class ReportController {
 
     // 1. Endpoint for Excel Download
     @GetMapping("/transactions/excel")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('VIEW_FINANCE_REPORTS')")
     public ResponseEntity<InputStreamResource> downloadTransactionExcel() {
         ByteArrayInputStream stream = reportService.generateTransactionExcel();
         
@@ -38,7 +38,7 @@ public class ReportController {
 
     // 2. Endpoint for PDF Download
     @GetMapping("/transactions/pdf")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('VIEW_FINANCE_REPORTS')")
     public ResponseEntity<InputStreamResource> downloadTransactionPdf() {
         ByteArrayInputStream stream = reportService.generateTransactionPdf();
         

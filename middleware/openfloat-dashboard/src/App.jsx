@@ -7,8 +7,6 @@ import AuditViewer from './components/AuditViewer';
 import Payouts from './components/Payouts'; 
 import ClientManagement from './components/ClientManagement';
 import NotificationBell from './components/NotificationBell'; 
-
-// ADDED IMPORTS FOR PROFILE & SECURITY
 import UserProfileDropdown from './components/UserProfileDropdown';
 import UserProfilePage from './components/UserProfilePage'; 
 
@@ -31,20 +29,36 @@ export default function App() {
     localStorage.removeItem('openfloat_user');
     localStorage.removeItem('token');
     localStorage.removeItem('role'); 
+    localStorage.removeItem('permissions');
   };
 
-  // === ROLE-BASED ACCESS CONTROL (RBAC) LOGIC ===
-  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
-  const isAdmin = user?.role === 'ADMIN';
+  // === NEW: GRANULAR PERMISSION CHECKER ===
+  const hasPermission = (requiredPermission) => {
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true; // Admins bypass all restrictions
+    return user.permissions?.includes(requiredPermission);
+  };
 
   const handleTabChange = (tab) => {
-    // 1. STRICT STATE GUARD
-    if ((tab === 'payouts' || tab === 'finance' || tab === 'clients') && !isManagerOrAdmin) {
+    // 1. STRICT STATE GUARD USING GRANULAR PERMISSIONS
+    if (tab === 'payouts' && !hasPermission('CREATE_PAYOUT') && !hasPermission('APPROVE_PAYOUT')) {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
     }
-    // SECURED: Added 'profile' to the strict Admin-only check
-    if ((tab === 'admin' || tab === 'viewer' || tab === 'profile') && !isAdmin) {
+    if (tab === 'finance' && !hasPermission('VIEW_FINANCE_REPORTS')) {
+      console.warn("Security Alert: Unauthorized access attempt blocked.");
+      return;
+    }
+    if (tab === 'clients' && !hasPermission('MANAGE_CLIENT_SYSTEMS')) {
+      console.warn("Security Alert: Unauthorized access attempt blocked.");
+      return;
+    }
+    if (tab === 'viewer' && !hasPermission('VIEW_AUDIT_LOGS')) {
+      console.warn("Security Alert: Unauthorized access attempt blocked.");
+      return;
+    }
+    // Admin Console is the only tab strictly locked to the base ADMIN role
+    if (tab === 'admin' && user?.role !== 'ADMIN') {
       console.warn("Security Alert: Unauthorized access attempt blocked.");
       return;
     }
@@ -66,7 +80,7 @@ export default function App() {
         <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
       </div>
       <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
-      <p className="text-slate-500 max-w-md">Your current role ({user.role}) does not have the required permissions to view this workspace.</p>
+      <p className="text-slate-500 max-w-md">You do not have the required system permissions to view this workspace.</p>
     </div>
   );
 
@@ -102,7 +116,7 @@ export default function App() {
         <nav className="flex-1 py-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
           <ul className="space-y-2 px-3">
             
-            {/* TIER 1: STAFF */}
+            {/* TIER 1: STAFF (Base Access) */}
             <li>
               <button 
                 onClick={() => handleTabChange('operator')}
@@ -116,77 +130,81 @@ export default function App() {
               </button>
             </li>
 
-            {/* TIER 2: MANAGERS & ADMINS */}
-            {isManagerOrAdmin && (
-              <>
-                <li>
-                  <button 
-                    onClick={() => handleTabChange('payouts')}
-                    title="Payouts"
-                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-                  >
-                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      Payouts
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => handleTabChange('finance')}
-                    title="Finance & Recon"
-                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-                  >
-                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      Finance & Recon
-                    </span>
-                  </button>
-                </li>
-                
-                <li>
-                  <button 
-                    onClick={() => handleTabChange('clients')}
-                    title="API Gateway"
-                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'clients' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-                  >
-                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      API Gateway
-                    </span>
-                  </button>
-                </li>
-              </>
+            {/* TIER 2: PERMISSION-BASED TABS */}
+            {(hasPermission('CREATE_PAYOUT') || hasPermission('APPROVE_PAYOUT')) && (
+              <li>
+                <button 
+                  onClick={() => handleTabChange('payouts')}
+                  title="Payouts"
+                  className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'payouts' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                >
+                  <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                    Payouts
+                  </span>
+                </button>
+              </li>
+            )}
+            
+            {hasPermission('VIEW_FINANCE_REPORTS') && (
+              <li>
+                <button 
+                  onClick={() => handleTabChange('finance')}
+                  title="Finance & Recon"
+                  className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'finance' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                >
+                  <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                  <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                    Finance & Recon
+                  </span>
+                </button>
+              </li>
+            )}
+            
+            {hasPermission('MANAGE_CLIENT_SYSTEMS') && (
+              <li>
+                <button 
+                  onClick={() => handleTabChange('clients')}
+                  title="API Gateway"
+                  className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'clients' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                >
+                  <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                  <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                    API Gateway
+                  </span>
+                </button>
+              </li>
+            )}
+            
+            {hasPermission('VIEW_AUDIT_LOGS') && (
+              <li>
+                <button 
+                  onClick={() => handleTabChange('viewer')}
+                  title="Audit Viewer"
+                  className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'viewer' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                >
+                  <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                  <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                    Audit Viewer
+                  </span>
+                </button>
+              </li>
             )}
             
             {/* TIER 3: ADMINS ONLY */}
-            {isAdmin && (
-              <>
-                <li>
-                  <button 
-                    onClick={() => handleTabChange('admin')}
-                    title="Admin Console"
-                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'admin' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-                  >
-                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      Admin Console
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => handleTabChange('viewer')}
-                    title="Audit Viewer"
-                    className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'viewer' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
-                  >
-                    <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                    <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                      Audit Viewer
-                    </span>
-                  </button>
-                </li>
-              </>
+            {user?.role === 'ADMIN' && (
+              <li>
+                <button 
+                  onClick={() => handleTabChange('admin')}
+                  title="Admin Console"
+                  className={`w-full flex items-center p-3 rounded-lg text-sm font-medium transition-all group ${activeTab === 'admin' ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'} ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'}`}
+                >
+                  <svg className={`flex-shrink-0 transition-transform ${isSidebarOpen ? 'w-5 h-5' : 'w-6 h-6 group-hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <span className={`transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                    Admin Console
+                  </span>
+                </button>
+              </li>
             )}
           </ul>
         </nav>
@@ -219,7 +237,6 @@ export default function App() {
 
       <main className="flex-1 flex flex-col h-screen overflow-x-hidden relative">
         
-        {/* UPDATED HEADER */}
         <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between shadow-sm z-10 h-20 shrink-0">
           <div className="flex items-center">
             <button 
@@ -231,7 +248,6 @@ export default function App() {
               </svg>
             </button>
 
-            {/* Dynamic Header Title including Profile */}
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 capitalize truncate">
               {activeTab === 'finance' ? 'Finance & Reconciliation' : 
                activeTab === 'payouts' ? 'Payouts' : 
@@ -241,11 +257,9 @@ export default function App() {
             </h2>
           </div>
 
-          {/* ADDED PROFILE DROPDOWN NEXT TO NOTIFICATION BELL */}
           <div className="flex items-center gap-4">
             <NotificationBell token={user.token} />
             
-            {/* SECURED: Passing the user prop down to the dropdown component */}
             <UserProfileDropdown 
               user={user} 
               onNavigate={() => handleTabChange('profile')} 
@@ -256,18 +270,22 @@ export default function App() {
         
         <div className="flex-1 overflow-x-hidden bg-slate-50 relative flex flex-col h-full">
           {activeTab === 'operator' ? (
-            <OperatorDashboard />
+            // Pass user down so OperatorDashboard can hide specific buttons
+            <OperatorDashboard user={user} />
           ) : (
             <div className="p-4 md:p-8 h-full overflow-y-auto">
               <div className="max-w-6xl mx-auto bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-100 h-full min-h-[500px]">
                 
-                {/* SECURED: Only Admins can render the UserProfilePage. Others get UnauthorizedAccess */}
-                {activeTab === 'profile' && (isAdmin ? <UserProfilePage /> : <UnauthorizedAccess />)}
-                {activeTab === 'payouts' && (isManagerOrAdmin ? <Payouts /> : <UnauthorizedAccess />)}
-                {activeTab === 'finance' && (isManagerOrAdmin ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
-                {activeTab === 'clients' && (isManagerOrAdmin ? <ClientManagement /> : <UnauthorizedAccess />)}
-                {activeTab === 'admin' && (isAdmin ? <AdminConsole /> : <UnauthorizedAccess />)}
-                {activeTab === 'viewer' && (isAdmin ? <AuditViewer token={user.token} /> : <UnauthorizedAccess />)}
+                {/* 
+                  Component Rendering Logic:
+                  Now checks for specific permissions before rendering the component payload
+                */}
+                {activeTab === 'profile' && <UserProfilePage />}
+                {activeTab === 'payouts' && (hasPermission('CREATE_PAYOUT') || hasPermission('APPROVE_PAYOUT') ? <Payouts user={user} /> : <UnauthorizedAccess />)}
+                {activeTab === 'finance' && (hasPermission('VIEW_FINANCE_REPORTS') ? <FinanceDashboard token={user.token} /> : <UnauthorizedAccess />)}
+                {activeTab === 'clients' && (hasPermission('MANAGE_CLIENT_SYSTEMS') ? <ClientManagement /> : <UnauthorizedAccess />)}
+                {activeTab === 'admin' && (user.role === 'ADMIN' ? <AdminConsole /> : <UnauthorizedAccess />)}
+                {activeTab === 'viewer' && (hasPermission('VIEW_AUDIT_LOGS') ? <AuditViewer token={user.token} /> : <UnauthorizedAccess />)}
                 
               </div>
             </div>

@@ -6,10 +6,10 @@ export default function Login({ onSuccessfulLogin }) {
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
 
-  // NEW: UI Toggle States
+  // UI Toggle States
   const [showPassword, setShowPassword] = useState(false);
   
-  // NEW: 2FA States
+  // 2FA States
   const [requiresMfa, setRequiresMfa] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
 
@@ -45,11 +45,16 @@ export default function Login({ onSuccessfulLogin }) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role);
         localStorage.setItem('openfloat_user', username);
+        
+        // NEW: Save the permissions array as a stringified JSON object
+        localStorage.setItem('permissions', JSON.stringify(data.permissions || []));
 
         onSuccessfulLogin({
           username: username,
           role: data.role, 
-          token: data.token
+          token: data.token,
+          // NEW: Pass permissions up to the global state
+          permissions: data.permissions || []
         });
 
       } else if (response.status === 401 && data?.error === 'MFA_REQUIRED') {

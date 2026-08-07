@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/c2b")
 public class C2bController {
 
-    // DOOR 1: Safaricom knocks here first to ask if the account is valid
+    // OPEN CALLBACK: Safaricom hits this validation endpoint.
     @PostMapping("/validation")
     public ResponseEntity<C2bResponse> validateTransaction(@RequestBody C2bRequest request) {
         
@@ -20,7 +20,7 @@ public class C2bController {
         return ResponseEntity.ok(response);
     }
 
-    // DOOR 2: Safaricom knocks here second to confirm the money has arrived
+    // OPEN CALLBACK: Safaricom hits this confirmation endpoint. Do not protect with @PreAuthorize.
     @PostMapping("/confirmation")
     public ResponseEntity<C2bResponse> confirmTransaction(@RequestBody C2bRequest request) {
         

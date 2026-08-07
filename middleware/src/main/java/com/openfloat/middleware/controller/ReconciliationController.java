@@ -4,6 +4,7 @@ import com.openfloat.middleware.dto.AuditReportResponse;
 import com.openfloat.middleware.service.ReconciliationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,6 +16,7 @@ public class ReconciliationController {
     private final ReconciliationService reconciliationService;
 
     @PostMapping("/audit")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('EXECUTE_RECONCILIATION')")
     public ResponseEntity<AuditReportResponse> runAudit(@RequestParam("providerFile") MultipartFile providerFile) {
         AuditReportResponse report = reconciliationService.processProviderStatement(providerFile);
         return ResponseEntity.ok(report);

@@ -2,7 +2,7 @@ import React from 'react';
 import MfaSetup from './MfaSetup'; 
 
 export default function UserProfilePage() {
-  // Safely parse the user object from local storage
+ // Safely parse the username for API calls
   let username = 'Admin';
   try {
     const savedUser = JSON.parse(localStorage.getItem('openfloat_user'));

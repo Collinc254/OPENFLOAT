@@ -2,6 +2,8 @@ package com.openfloat.middleware.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "system_users") 
@@ -42,6 +44,17 @@ public class SystemUser {
 
     @Column
     private String mfaSecret; 
+
+    // ==========================================
+    // GRANULAR PERMISSIONS
+    // ==========================================
+    
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_permissions", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission")
+    @Builder.Default
+    private Set<Permission> permissions = new HashSet<>();
 
     // Custom getter safely handles legacy database rows that have 'null'
     // This keeps AuthController.java perfectly happy!

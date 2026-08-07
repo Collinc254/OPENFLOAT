@@ -1,7 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import fetchWithAuth from './api'; // Adjust this path if necessary
 
-export default function FinanceDashboard({ token }) {
+export default function FinanceDashboard({ user, token }) {
+  // === GRANULAR PERMISSION CHECKS ===
+  // Fallback to localStorage if the 'user' prop was not passed down from App.jsx
+  const currentUser = user || JSON.parse(localStorage.getItem('openfloat_user') || '{}');
+  const permissions = currentUser?.permissions || [];
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const canExecuteRecon = isAdmin || permissions.includes('EXECUTE_RECONCILIATION');
+
   // View state
   const [activeTab, setActiveTab] = useState('transactions'); 
   const [showFilters, setShowFilters] = useState(false);
@@ -75,7 +82,6 @@ export default function FinanceDashboard({ token }) {
         ? `${API_URL}/api/v1/transactions/filter?${queryString}` 
         : `${API_URL}/api/v1/payments`;
       
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(endpoint, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -123,7 +129,6 @@ export default function FinanceDashboard({ token }) {
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
       
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_URL}/api/v1/payments/resolve`, {
         method: 'POST',
         headers: {
@@ -169,12 +174,10 @@ export default function FinanceDashboard({ token }) {
       const formData = new FormData();
       formData.append('providerFile', auditFile);
 
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(`${API_URL}/api/v1/reconciliation/audit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
-          // Fetch automatically sets the correct multipart boundary
         },
         body: formData
       });
@@ -199,7 +202,6 @@ export default function FinanceDashboard({ token }) {
         ? `${API_URL}/api/v1/reports/transactions/excel`
         : `${API_URL}/api/v1/reports/transactions/pdf`;
       
-      // SWAPPED: fetch -> fetchWithAuth
       const response = await fetchWithAuth(endpoint, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -264,7 +266,6 @@ export default function FinanceDashboard({ token }) {
     const systems = {};
     const now = new Date();
 
-    // 1. Filter transactions based on the selected time range
     const filteredTransactions = transactions.filter(tx => {
       if (!tx.date) return true;
       const txDate = new Date(tx.date);
@@ -287,7 +288,6 @@ export default function FinanceDashboard({ token }) {
       }
     });
 
-    // 2. Calculate metrics based on the filtered transactions
     filteredTransactions.forEach(tx => {
       const isSuccess = ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status);
       const sys = tx.clientSystem;
@@ -332,14 +332,12 @@ export default function FinanceDashboard({ token }) {
             </button>
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
-                {/* 1. Official Backend Reports */}
                 <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Official Reports</div>
                 <button onClick={() => downloadBackendReport('pdf')} className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-slate-100 font-semibold">Download PDF Report</button>
                 <button onClick={() => downloadBackendReport('excel')} className="w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-slate-100 font-semibold">Download Excel Report</button>
                 
                 <div className="border-t border-slate-100 my-1"></div>
                 
-                {/* 2. Local CSV Exports */}
                 <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Local CSV Exports</div>
                 <button onClick={() => downloadCSV('ALL')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Export All Records</button>
                 <button onClick={() => downloadCSV('SUCCESS')} className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-slate-100">Export Successful</button>
@@ -408,9 +406,6 @@ export default function FinanceDashboard({ token }) {
                    <td className="px-6 py-4 font-mono font-medium">{tx.mpesaRef}</td>
                    <td className="px-6 py-4 font-semibold">KES {tx.amount}</td>
                    <td className="px-6 py-4">
-                     {/* ============================================== */}
-                     {/* FIX: Dynamic Status Colors matching Operator Dashboard */}
-                     {/* ============================================== */}
                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider border ${
                         ['SUCCESS', 'PAID', 'COMPLETED'].includes(tx.status) ? 'bg-green-50 text-green-700 border-green-200' :
                         tx.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200' :
@@ -429,7 +424,6 @@ export default function FinanceDashboard({ token }) {
         {activeTab === 'reports' && (
           <div className="p-6">
             
-            {/* Time Period Segmented Control */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
               <h3 className="text-lg font-bold text-slate-800">Revenue Metrics</h3>
               <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 overflow-x-auto max-w-full">
@@ -452,7 +446,6 @@ export default function FinanceDashboard({ token }) {
               </div>
             </div>
 
-            {/* Top Level KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm border-l-4 border-l-green-500">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Revenue</p>
@@ -472,7 +465,6 @@ export default function FinanceDashboard({ token }) {
               </div>
             </div>
 
-            {/* Client System Breakdown Table */}
             <h3 className="text-lg font-bold text-slate-800 mb-4">Revenue by Client System</h3>
             <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
               <table className="w-full text-left border-collapse">
@@ -530,9 +522,14 @@ export default function FinanceDashboard({ token }) {
                       <td className="px-6 py-4">{tx.phone}</td>
                       <td className="px-6 py-4 font-bold text-red-700">KES {tx.amount}</td>
                       <td className="px-6 py-4 text-right">
-                        <button onClick={() => setResolvingTx(tx)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50">
-                          Resolve Manual
-                        </button>
+                        {/* SECURED: Hide manual resolution for users without EXECUTE_RECONCILIATION */}
+                        {canExecuteRecon ? (
+                          <button onClick={() => setResolvingTx(tx)} className="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50">
+                            Resolve Manual
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">Restricted</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -574,26 +571,37 @@ export default function FinanceDashboard({ token }) {
               <h3 className="text-lg font-bold text-slate-800 mb-2">Initialize 3-Way Reconciliation</h3>
               <p className="text-sm text-slate-500 mb-6">Compare Provider Statements (Safaricom) against the OpenFloat Database and Client System confirmations to detect missing, duplicate, or mismatched amounts.</p>
               
-              <div className="space-y-4">
-                <div 
-                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${auditFile ? 'border-green-400 bg-green-50' : 'border-slate-300 hover:bg-slate-50'}`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <p className="text-sm font-bold text-slate-700">
-                    {auditFile ? `Selected: ${auditFile.name}` : '1. Upload Provider CSV (Safaricom)'}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">Select the raw statement from the provider portal.</p>
-                  <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={(e) => setAuditFile(e.target.files[0])} />
-                </div>
-              </div>
+              {/* SECURED: Hide upload functionality for users without EXECUTE_RECONCILIATION */}
+              {canExecuteRecon ? (
+                <>
+                  <div className="space-y-4">
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${auditFile ? 'border-green-400 bg-green-50' : 'border-slate-300 hover:bg-slate-50'}`}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <p className="text-sm font-bold text-slate-700">
+                        {auditFile ? `Selected: ${auditFile.name}` : '1. Upload Provider CSV (Safaricom)'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">Select the raw statement from the provider portal.</p>
+                      <input type="file" className="hidden" ref={fileInputRef} accept=".csv" onChange={(e) => setAuditFile(e.target.files[0])} />
+                    </div>
+                  </div>
 
-              <button 
-                onClick={handleRunAudit} 
-                disabled={auditLoading || !auditFile}
-                className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors flex justify-center items-center gap-2"
-              >
-                {auditLoading ? 'Processing Statement...' : 'Run Audit Engine'}
-              </button>
+                  <button 
+                    onClick={handleRunAudit} 
+                    disabled={auditLoading || !auditFile}
+                    className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-lg transition-colors flex justify-center items-center gap-2"
+                  >
+                    {auditLoading ? 'Processing Statement...' : 'Run Audit Engine'}
+                  </button>
+                </>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-8 text-center">
+                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  <p className="text-sm font-semibold text-slate-700">Audit Restricted</p>
+                  <p className="text-xs text-slate-500 mt-1">You require the EXECUTE_RECONCILIATION permission to run 3-way audits.</p>
+                </div>
+              )}
 
               {/* AUDIT RESULTS RENDER */}
               {auditResults && (
