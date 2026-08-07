@@ -37,8 +37,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         
-        // Identify the client by their IP address
-        String ip = request.getRemoteAddr();
+        // Identify the client by their IP address, accounting for reverse proxies/load balancers
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String ip = (forwardedFor != null && !forwardedFor.isEmpty()) ? forwardedFor.split(",")[0].trim() : request.getRemoteAddr();
         
         // Fetch their existing bucket, or create a new one if it's their first request
         Bucket bucket = cache.computeIfAbsent(ip, k -> createNewBucket());

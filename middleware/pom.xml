@@ -27,6 +27,10 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
         <dependency>
@@ -42,7 +46,7 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- Added Jackson Dependency for JSON parsing -->
+        <!-- Jackson Dependency for JSON parsing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -62,19 +66,13 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Consolidated Official Spring Boot Test Starter -->
+        <!-- Test Starter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- AMQP Dependency for RabbitMQ Message Queue -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
-        </dependency>
-        
         <!-- JSON Web Token (JWT) Libraries -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -94,35 +92,26 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ========================================== -->
-        <!-- SECURITY & RATE LIMITING                   -->
-        <!-- ========================================== -->
+        <!-- Security & Rate Limiting -->
         <dependency>
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j-core</artifactId>
             <version>8.10.1</version>
         </dependency>
 
-        <!-- ========================================== -->
-        <!-- TWO-FACTOR AUTHENTICATION (TOTP)           -->
-        <!-- ========================================== -->
+        <!-- Two-Factor Authentication (TOTP) -->
         <dependency>
             <groupId>dev.samstevens.totp</groupId>
             <artifactId>totp-spring-boot-starter</artifactId>
             <version>1.7.1</version>
         </dependency>
 
-        <!-- ========================================== -->
-        <!-- NEW REPORTING DEPENDENCIES                 -->
-        <!-- ========================================== -->
-        <!-- Apache POI for Excel Report Generation -->
+        <!-- Reporting Dependencies -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.3</version>
         </dependency>
-
-        <!-- OpenPDF for PDF Report Generation -->
         <dependency>
             <groupId>com.github.librepdf</groupId>
             <artifactId>openpdf</artifactId>

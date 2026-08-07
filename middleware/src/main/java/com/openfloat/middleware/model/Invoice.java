@@ -1,5 +1,6 @@
 package com.openfloat.middleware.model;
 
+import com.openfloat.middleware.security.AttributeEncryptor;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -26,6 +27,8 @@ public class Invoice {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
+    // ENCRYPTION ADDED: Protects the customer phone number at rest
+    @Convert(converter = AttributeEncryptor.class)
     @Column(nullable = false)
     private String customerMsisdn;
 

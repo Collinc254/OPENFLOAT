@@ -1,5 +1,6 @@
 package com.openfloat.middleware.entity;
 
+import com.openfloat.middleware.security.AttributeEncryptor;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.HashSet;
@@ -42,7 +43,9 @@ public class SystemUser {
     @Builder.Default
     private Boolean mfaEnabled = false;
 
+    // ENCRYPTION ADDED: Protects the 2FA seed from database breaches
     @Column
+    @Convert(converter = AttributeEncryptor.class)
     private String mfaSecret; 
 
     // ==========================================

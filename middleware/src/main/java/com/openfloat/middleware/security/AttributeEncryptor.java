@@ -16,11 +16,9 @@ public class AttributeEncryptor implements AttributeConverter<String, String> {
     private static final String SECRET = "OpenFloatEnterpriseSecretKey2026"; 
 
     private final Key key;
-    private final Cipher cipher;
 
-    public AttributeEncryptor() throws Exception {
+    public AttributeEncryptor() {
         key = new SecretKeySpec(SECRET.getBytes(), AES);
-        cipher = Cipher.getInstance(AES);
     }
 
     @Override
@@ -29,6 +27,8 @@ public class AttributeEncryptor implements AttributeConverter<String, String> {
             return null;
         }
         try {
+            // Instantiating Cipher inside the method guarantees thread safety
+            Cipher cipher = Cipher.getInstance(AES);
             cipher.init(Cipher.ENCRYPT_MODE, key);
             return Base64.getEncoder().encodeToString(cipher.doFinal(attribute.getBytes()));
         } catch (Exception e) {
@@ -42,6 +42,8 @@ public class AttributeEncryptor implements AttributeConverter<String, String> {
             return null;
         }
         try {
+            // Instantiating Cipher inside the method guarantees thread safety
+            Cipher cipher = Cipher.getInstance(AES);
             cipher.init(Cipher.DECRYPT_MODE, key);
             return new String(cipher.doFinal(Base64.getDecoder().decode(dbData)));
         } catch (Exception e) {
