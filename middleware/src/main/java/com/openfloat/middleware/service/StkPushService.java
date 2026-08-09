@@ -7,9 +7,10 @@ import com.openfloat.middleware.dto.DarajaStkPushResponse;
 import com.openfloat.middleware.dto.StkPushRequest;
 import com.openfloat.middleware.model.MpesaTransaction;
 import com.openfloat.middleware.model.WebhookPayload;
+import com.openfloat.middleware.entity.PaybillConfiguration;
 import com.openfloat.middleware.repository.PaymentReferenceRepository;
 import com.openfloat.middleware.repository.TransactionRepository;
-// ADDED IMPORT
+import com.openfloat.middleware.repository.PaybillConfigurationRepository;
 import com.openfloat.middleware.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,22 +33,11 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class StkPushService {
 
-    @Value("${safaricom.daraja.consumer-key}")
-    private String consumerKey;
-
-    @Value("${safaricom.daraja.consumer-secret}")
-    private String consumerSecret;
-
-    @Value("${safaricom.daraja.shortcode}")
-    private String shortcode;
-
-    @Value("${safaricom.daraja.passkey}")
-    private String passkey;
-
-    @Value("${safaricom.daraja.auth-url}")
+    // Removed static credential @Values. Keeping global routing URLs.
+    @Value("${safaricom.daraja.auth-url:https://sandbox.safaricom.co.ke/oauth/v1/generate}")
     private String authUrl;
 
-    @Value("${safaricom.daraja.stk-push-url}")
+    @Value("${safaricom.daraja.stk-push-url:https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest}")
     private String stkPushUrl;
 
     @Value("${safaricom.daraja.callback-url}")
@@ -57,35 +47,40 @@ public class StkPushService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final TransactionRepository transactionRepository;
     private final RabbitTemplate rabbitTemplate;
-    
-    // 1. INJECTED THE REFERENCE REPOSITORY
     private final PaymentReferenceRepository referenceRepository;
-
-    // ADDED NOTIFICATION SERVICE INJECTION
     private final NotificationService notificationService;
+    
+    // NEW: Inject dynamic paybill configurations
+    private final PaybillConfigurationRepository paybillRepository;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         
         // ==========================================
-        // NEW: PREVENT DUPLICATE REQUESTS (RACE CONDITIONS)
+        // PREVENT DUPLICATE REQUESTS (RACE CONDITIONS)
         // ==========================================
         if (transactionRepository.existsById(request.invoiceRef())) {
             log.warn("Blocked duplicate STK Push request for Invoice Ref: {}", request.invoiceRef());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A transaction with this invoice reference is already processing.");
         }
 
-        String token = getAccessToken();
+        // FETCH ACTIVE DATABASE CONFIGURATION
+        PaybillConfiguration config = paybillRepository.findAll().stream()
+                .filter(PaybillConfiguration::isActive)
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No active Paybill Configuration found in the database."));
+
+        String token = getAccessToken(config);
         String timestamp = generateTimestamp();
-        String password = generatePassword(timestamp);
+        String password = generatePassword(config, timestamp);
 
         DarajaStkPushPayload payload = new DarajaStkPushPayload(
-                shortcode,
+                config.getShortcode(),
                 password,
                 timestamp,
                 "CustomerPayBillOnline",
                 String.valueOf(request.amount().intValue()),
                 request.msisdn(),
-                shortcode,
+                config.getShortcode(),
                 request.msisdn(),
                 callbackUrl,
                 request.invoiceRef(),
@@ -98,7 +93,7 @@ public class StkPushService {
 
         HttpEntity<DarajaStkPushPayload> entity = new HttpEntity<>(payload, headers);
 
-        log.info("Initiating STK Push to MSISDN: {} for Amount: {}", request.msisdn(), request.amount());
+        log.info("Initiating STK Push to MSISDN: {} for Amount: {} via Shortcode: {}", request.msisdn(), request.amount(), config.getShortcode());
 
         try {
             ResponseEntity<DarajaStkPushResponse> response = restTemplate.postForEntity(
@@ -186,7 +181,7 @@ public class StkPushService {
                         }
                     }
                     
-                    // 2. NEW MULTI-TENANT RABBITMQ ROUTING LOGIC
+                    // MULTI-TENANT RABBITMQ ROUTING LOGIC
                     String accountReference = trx.getId(); 
                     final String finalReceipt = mpesaReceiptNumber;
 
@@ -215,7 +210,6 @@ public class StkPushService {
                     }, () -> {
                         log.warn("Received successful payment but could not find matching API Gateway reference code: {}", accountReference);
                         
-                        // ADDED NOTIFICATION TRIGGER FOR UNKNOWN REFERENCE
                         notificationService.createAlert(
                             "UNKNOWN_REFERENCE", 
                             "Payment received for unregistered reference: " + accountReference + " (Receipt: " + finalReceipt + ")"
@@ -240,10 +234,11 @@ public class StkPushService {
 
     private record DarajaAuthResponse(String access_token) {}
 
-    private String getAccessToken() {
+    // Pass the active config to generate the token
+    private String getAccessToken(PaybillConfiguration config) {
         HttpHeaders headers = new HttpHeaders();
         
-        headers.setBasicAuth(consumerKey.trim(), consumerSecret.trim()); 
+        headers.setBasicAuth(config.getConsumerKey().trim(), config.getConsumerSecret().trim()); 
         headers.add("Cache-Control", "no-cache");
         
         HttpEntity<String> request = new HttpEntity<>(headers);
@@ -274,8 +269,9 @@ public class StkPushService {
         return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     }
 
-    private String generatePassword(String timestamp) {
-        String rawData = shortcode + passkey + timestamp;
+    // Pass the active config to generate the password using the Passkey
+    private String generatePassword(PaybillConfiguration config, String timestamp) {
+        String rawData = config.getShortcode() + config.getPasskey() + timestamp;
         return Base64.getEncoder().encodeToString(rawData.getBytes(StandardCharsets.UTF_8));
     }
 }

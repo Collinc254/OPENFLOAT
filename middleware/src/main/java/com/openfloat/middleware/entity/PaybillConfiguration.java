@@ -34,6 +34,10 @@ public class PaybillConfiguration {
     @Column(name = "consumer_secret", nullable = false)
     private String consumerSecret;
 
+    // ADDED PASSKEY FIELD FOR STK PUSH
+    @Column(name = "passkey", length = 500)
+    private String passkey;
+
     // e.g., "SANDBOX" or "PRODUCTION"
     @Column(nullable = false)
     private String environment; 

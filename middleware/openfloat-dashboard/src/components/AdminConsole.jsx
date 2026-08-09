@@ -30,6 +30,7 @@ export default function AdminConsole() {
     initiatorPassword: '',
     consumerKey: '',
     consumerSecret: '',
+    passkey: '', // ADDED: Passkey state
     environment: 'PRODUCTION'
   });
   const [paybillStatus, setPaybillStatus] = useState('');
@@ -133,8 +134,10 @@ export default function AdminConsole() {
       if (!response.ok) throw new Error('Failed to create paybill');
       
       setPaybillStatus('Paybill added successfully!');
+      
+      // ADDED: Reset passkey along with other fields
       setPaybillForm({
-        shortcode: '', initiatorName: '', initiatorPassword: '', consumerKey: '', consumerSecret: '', environment: 'PRODUCTION'
+        shortcode: '', initiatorName: '', initiatorPassword: '', consumerKey: '', consumerSecret: '', passkey: '', environment: 'PRODUCTION'
       });
       setShowAddPaybill(false);
       fetchPaybills();
@@ -315,6 +318,17 @@ export default function AdminConsole() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Consumer Secret</label>
                   <input type="password" required value={paybillForm.consumerSecret} onChange={e => setPaybillForm({...paybillForm, consumerSecret: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                </div>
+                {/* ADDED: STK Passkey Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">STK Passkey</label>
+                  <input 
+                    type="password" 
+                    required 
+                    value={paybillForm.passkey} 
+                    onChange={e => setPaybillForm({...paybillForm, passkey: e.target.value})} 
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+                  />
                 </div>
                 <div className="md:col-span-2 mt-2">
                   <button type="submit" className="w-full bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 transition-colors">
