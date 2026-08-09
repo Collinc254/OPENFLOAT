@@ -31,15 +31,26 @@ public class AuditLog {
     private String targetComponent;
     private String status;
 
+    // ==========================================
+    // IMMUTABLE CRYPTOGRAPHIC CHAIN
+    // ==========================================
+    @Column(nullable = false, length = 64)
+    private String previousHash;
+
+    @Column(nullable = false, length = 64)
+    private String currentHash;
+
     public AuditLog() {}
 
-    public AuditLog(String actor, String action, String targetComponent, String status) {
+    public AuditLog(String actor, String action, String targetComponent, String status, String previousHash, String currentHash) {
         this.eventId = UUID.randomUUID().toString();
         this.actor = actor;
         this.action = action;
         this.targetComponent = targetComponent;
         this.status = status;
         this.timestamp = LocalDateTime.now(); 
+        this.previousHash = previousHash;
+        this.currentHash = currentHash;
     }
 
     public Long getId() { return id; }
@@ -62,4 +73,10 @@ public class AuditLog {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getPreviousHash() { return previousHash; }
+    public void setPreviousHash(String previousHash) { this.previousHash = previousHash; }
+
+    public String getCurrentHash() { return currentHash; }
+    public void setCurrentHash(String currentHash) { this.currentHash = currentHash; }
 }

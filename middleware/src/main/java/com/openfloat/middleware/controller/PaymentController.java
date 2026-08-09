@@ -5,6 +5,7 @@ import com.openfloat.middleware.dto.ResolveTransactionRequest;
 import com.openfloat.middleware.dto.StkPushRequest;
 import com.openfloat.middleware.model.MpesaTransaction;
 import com.openfloat.middleware.service.AuditLogService;
+import com.openfloat.middleware.service.MpesaMetricsService;
 import com.openfloat.middleware.service.StkPushService;
 import com.openfloat.middleware.repository.TransactionRepository;
 
@@ -32,7 +33,10 @@ public class PaymentController {
 
     private final StkPushService stkPushService;
     private final TransactionRepository transactionRepository;
-    private final AuditLogService auditLogService; // Injected AuditLogService for SIEM trails
+    private final AuditLogService auditLogService; 
+    
+    // INJECTED OBSERVABILITY METRICS
+    private final MpesaMetricsService mpesaMetricsService;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('READ_TRANSACTIONS')")
@@ -43,8 +47,13 @@ public class PaymentController {
 
     @PostMapping(value = {"/trigger", "/stk-push"})
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('INITIATE_STK_PUSH')")
-    public ResponseEntity<DarajaStkPushResponse> triggerStkPush(@RequestBody StkPushRequest request) {
-        DarajaStkPushResponse response = stkPushService.sendPush(request);
+    public ResponseEntity<DarajaStkPushResponse> triggerStkPush(@RequestBody StkPushRequest request) throws Exception {
+        
+        // PROMETHEUS HOOK: Wrap the outbound request to measure Daraja API latency
+        DarajaStkPushResponse response = mpesaMetricsService.recordApiLatency(() -> {
+            return stkPushService.sendPush(request);
+        });
+        
         return ResponseEntity.ok(response);
     }
 

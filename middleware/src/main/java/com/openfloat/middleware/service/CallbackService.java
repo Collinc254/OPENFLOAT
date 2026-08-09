@@ -21,57 +21,77 @@ public class CallbackService {
 
     private final InvoiceRepository invoiceRepository;
     private final EventPublisherService eventPublisherService;
+    
+    // INJECTED OBSERVABILITY METRICS
+    private final MpesaMetricsService mpesaMetricsService; 
 
     @Transactional(readOnly = true)
     public MpesaCallbackResponse validatePayment(MpesaCallbackRequest request) {
-        String invoiceNo = request.billRefNumber();
+        try {
+            String invoiceNo = request.billRefNumber();
 
-        // 1. Fetch and assign the invoice variable
-        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
-                .orElseThrow(() -> new ValidationRejectedException("Invalid account reference. Invoice not found."));
+            // 1. Fetch and assign the invoice variable
+            Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
+                    .orElseThrow(() -> new ValidationRejectedException("Invalid account reference. Invoice not found."));
 
-        if (!invoice.getTenant().isActive()) {
-            throw new ValidationRejectedException("Target service is currently inactive.");
+            if (!invoice.getTenant().isActive()) {
+                throw new ValidationRejectedException("Target service is currently inactive.");
+            }
+
+            if (request.transAmount().compareTo(invoice.getAmount()) != 0) {
+                throw new ValidationRejectedException("Amount mismatch. Expected: " + invoice.getAmount());
+            }
+
+            return MpesaCallbackResponse.accept();
+            
+        } catch (Exception e) {
+            // PROMETHEUS HOOK: Record validation failures
+            mpesaMetricsService.incrementFailedCallback();
+            throw e;
         }
-
-        if (request.transAmount().compareTo(invoice.getAmount()) != 0) {
-            throw new ValidationRejectedException("Amount mismatch. Expected: " + invoice.getAmount());
-        }
-
-        return MpesaCallbackResponse.accept();
     }
 
     @Transactional
     public String confirmPayment(MpesaConfirmationRequest request) {
-        String invoiceNo = request.billRefNumber();
+        try {
+            String invoiceNo = request.billRefNumber();
 
-        // 2. Fetch and assign the invoice variable
-        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
-                .orElseThrow(() -> new IllegalArgumentException("Received confirmation for unknown invoice: " + invoiceNo));
+            // 2. Fetch and assign the invoice variable
+            Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNo)
+                    .orElseThrow(() -> new IllegalArgumentException("Received confirmation for unknown invoice: " + invoiceNo));
 
-        if ("PAID".equals(invoice.getStatus())) {
-            log.warn("Duplicate confirmation received for invoice: {}. Safaricom TransID: {}", invoiceNo, request.transId());
-            return "Acknowledged Duplicate";
+            if ("PAID".equals(invoice.getStatus())) {
+                log.warn("Duplicate confirmation received for invoice: {}. Safaricom TransID: {}", invoiceNo, request.transId());
+                return "Acknowledged Duplicate";
+            }
+
+            invoice.setStatus("PAID");
+            invoiceRepository.save(invoice);
+
+            log.info("Successfully confirmed payment for Invoice: {} Amount: {}", invoiceNo, request.transAmount());
+
+            // 3. Build the payload for the ERP system
+            PaymentEvent paymentEvent = new PaymentEvent(
+                request.transId(), // Using M-Pesa Receipt Number as the reconciliation ID
+                invoice.getInvoiceNumber(),
+                request.msisdn(),
+                request.transAmount(),
+                invoice.getServiceRef(),
+                LocalDateTime.now()
+            );
+
+            // 4. Publish the event to RabbitMQ
+            eventPublisherService.publishPaymentConfirmed(paymentEvent);
+
+            // PROMETHEUS HOOK: Record fully successful end-to-end confirmation
+            mpesaMetricsService.incrementSuccessfulCallback();
+
+            return "Acknowledged";
+            
+        } catch (Exception e) {
+            // PROMETHEUS HOOK: Record internal failures during confirmation
+            mpesaMetricsService.incrementFailedCallback();
+            throw e;
         }
-
-        invoice.setStatus("PAID");
-        invoiceRepository.save(invoice);
-
-        log.info("Successfully confirmed payment for Invoice: {} Amount: {}", invoiceNo, request.transAmount());
-
-        // 3. Build the payload for the ERP system
-        PaymentEvent paymentEvent = new PaymentEvent(
-            request.transId(), // Using M-Pesa Receipt Number as the reconciliation ID
-            invoice.getInvoiceNumber(),
-            request.msisdn(),
-            request.transAmount(),
-            invoice.getServiceRef(),
-            LocalDateTime.now()
-        );
-
-        // 4. Publish the event to RabbitMQ
-        eventPublisherService.publishPaymentConfirmed(paymentEvent);
-
-        return "Acknowledged";
     }
 }

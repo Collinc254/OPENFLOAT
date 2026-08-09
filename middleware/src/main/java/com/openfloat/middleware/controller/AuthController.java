@@ -4,6 +4,8 @@ import com.openfloat.middleware.entity.SystemUser;
 import com.openfloat.middleware.repository.UserRepository;
 import com.openfloat.middleware.security.CustomUserDetailsService;
 import com.openfloat.middleware.security.JwtUtil;
+import com.openfloat.middleware.service.AuditLogService;
+import com.openfloat.middleware.service.LdapAuthenticationService;
 
 import dev.samstevens.totp.code.CodeGenerator;
 import dev.samstevens.totp.code.CodeVerifier;
@@ -43,6 +45,10 @@ public class AuthController {
     private final CustomUserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    
+    // ENTERPRISE IDENTITY & SIEM COMPLIANCE
+    private final LdapAuthenticationService ldapAuthenticationService;
+    private final AuditLogService auditLogService;
 
     // TOTP helper instances
     private final SecretGenerator secretGenerator = new DefaultSecretGenerator();
@@ -53,25 +59,41 @@ public class AuthController {
     );
 
     // ==========================================
-    // 1. LOGIN (WITH OPTIONAL 2FA CHECK)
+    // 1. LOGIN (LDAP/LOCAL WITH 2FA CHECK)
     // ==========================================
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthRequest authRequest) {
+        String username = authRequest.username();
+        
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(authRequest.username(), authRequest.password())
-            );
+            // ENTERPRISE ROUTING: Check if we are using Active Directory or Local DB
+            if (ldapAuthenticationService.isLdapEnabled()) {
+                boolean isLdapValid = ldapAuthenticationService.authenticate(username, authRequest.password());
+                if (!isLdapValid) {
+                    return ResponseEntity.status(401).body("Access Denied: Incorrect Active Directory credentials.");
+                }
+            } else {
+                authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(username, authRequest.password())
+                );
+            }
         } catch (AuthenticationException e) {
+            // SIEM AUDIT: Log failed local login attempts
+            auditLogService.logEvent(username, "SYSTEM_LOGIN", "AuthController", "FAILED_BAD_CREDENTIALS");
             return ResponseEntity.status(401).body("Access Denied: Incorrect credentials.");
         }
 
-        SystemUser user = userRepository.findByUsername(authRequest.username())
+        SystemUser user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // ENFORCED RULE: Check if user is an ADMIN AND has Two-Factor Authentication enabled
         if ("ADMIN".equals(user.getRole().name()) && user.isMfaEnabled()) {
             String code = authRequest.code();
             if (code == null || code.isBlank() || !codeVerifier.isValidCode(user.getMfaSecret(), code)) {
+                
+                // SIEM AUDIT: Log failed MFA attempts for security monitoring
+                auditLogService.logEvent(username, "MFA_VERIFICATION", "AuthController", "FAILED");
+                
                 return ResponseEntity.status(401).body(Map.of(
                         "error", "MFA_REQUIRED",
                         "message", "Two-Factor Authentication code is required or invalid."
@@ -79,7 +101,10 @@ public class AuthController {
             }
         }
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.username());
+        // SIEM AUDIT: Log fully successful login execution
+        auditLogService.logEvent(username, "SYSTEM_LOGIN", "AuthController", "SUCCESS");
+
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(username);
         final String accessToken = jwtUtil.generateToken(userDetails);
         final String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
@@ -135,6 +160,9 @@ public class AuthController {
             byte[] qrCodeImageData = qrGenerator.generate(data);
             String qrCodeDataUri = Utils.getDataUriForImage(qrCodeImageData, qrGenerator.getImageMimeType());
 
+            // SIEM AUDIT: Log MFA configuration initiation
+            auditLogService.logEvent(username, "MFA_SETUP_INITIATED", "AuthController", "SUCCESS");
+
             return ResponseEntity.ok(Map.of(
                     "secret", secret,
                     "qrCodeDataUri", qrCodeDataUri
@@ -159,6 +187,9 @@ public class AuthController {
         user.setMfaSecret(request.secret());
         user.setMfaEnabled(true);
         userRepository.save(user);
+        
+        // SIEM AUDIT: Log successful MFA activation
+        auditLogService.logEvent(request.username(), "MFA_ENABLED", "AuthController", "SUCCESS");
 
         return ResponseEntity.ok(Map.of("message", "Two-Factor Authentication successfully enabled."));
     }
