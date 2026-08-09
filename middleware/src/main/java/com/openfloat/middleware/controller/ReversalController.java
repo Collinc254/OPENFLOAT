@@ -17,7 +17,8 @@ public class ReversalController {
     @PostMapping("/initiate")
     @PreAuthorize("hasAuthority('PROCESS_REFUNDS') or hasAuthority('ADMIN')")
     public ResponseEntity<?> initiateReversal(@RequestBody ReversalRequest request) {
-        return reversalService.initiateReversal(request);
+        // FIX: Pass the temporarily hardcoded shortcode to the service
+        return reversalService.initiateReversal(request, "4320161");
     }
 
     // Safaricom Callback Endpoints for Reversal

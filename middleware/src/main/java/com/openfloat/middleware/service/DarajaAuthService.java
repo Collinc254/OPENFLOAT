@@ -1,9 +1,10 @@
 package com.openfloat.middleware.service;
 
 import com.openfloat.middleware.dto.OAuthResponse;
+import com.openfloat.middleware.entity.PaybillConfiguration;
+import com.openfloat.middleware.repository.PaybillConfigurationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -15,18 +16,15 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class DarajaAuthService {
 
-    @Value("${safaricom.consumer-key}")
-    private String consumerKey;
+    private final PaybillConfigurationRepository paybillRepository;
 
-    @Value("${safaricom.consumer-secret}")
-    private String consumerSecret;
-
-    @Value("${safaricom.oauth-endpoint:https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials}")
-    private String oauthEndpoint;
-
-    public String getAccessToken() {
+    public String getAccessToken(String shortcode) {
         try {
-            String credentials = consumerKey + ":" + consumerSecret;
+            // 1. Fetch dynamic credentials for the provided shortcode
+            PaybillConfiguration paybill = paybillRepository.findByShortcodeAndIsActiveTrue(shortcode)
+                    .orElseThrow(() -> new RuntimeException("Active configuration not found for shortcode: " + shortcode));
+
+            String credentials = paybill.getConsumerKey() + ":" + paybill.getConsumerSecret();
             String encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes());
 
             HttpHeaders headers = new HttpHeaders();
@@ -36,7 +34,12 @@ public class DarajaAuthService {
             HttpEntity<String> request = new HttpEntity<>(headers);
             RestTemplate restTemplate = new RestTemplate();
 
-            log.info("Requesting new Daraja OAuth token...");
+            // 2. Determine the correct endpoint based on environment
+            String oauthEndpoint = "PRODUCTION".equalsIgnoreCase(paybill.getEnvironment())
+                    ? "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+                    : "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+
+            log.info("Requesting new Daraja OAuth token for shortcode: {}", shortcode);
             ResponseEntity<OAuthResponse> response = restTemplate.exchange(
                     oauthEndpoint,
                     HttpMethod.GET,
@@ -44,7 +47,7 @@ public class DarajaAuthService {
                     OAuthResponse.class
             );
 
-            log.info("OAuth token successfully generated.");
+            log.info("OAuth token successfully generated for shortcode: {}", shortcode);
             return response.getBody().getAccessToken();
 
         } catch (Exception e) {

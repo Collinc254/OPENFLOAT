@@ -3,7 +3,7 @@ package com.openfloat.middleware.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp; // Added missing import
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -19,7 +19,8 @@ public class B2CTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "originator_conversation_id", unique = true, nullable = false)
+    // REMOVED 'nullable = false': Drafts do not have this ID until sent to Safaricom
+    @Column(name = "originator_conversation_id", unique = true)
     private String originatorConversationId;
 
     @Column(name = "conversation_id")
@@ -31,8 +32,13 @@ public class B2CTransaction {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    // Kept as String to match your existing database schema
     @Column(name = "amount")
     private String amount;
+    
+    // ADDED: Tracks the exact Daraja paybill to pull funds from
+    @Column(name = "shortcode")
+    private String shortcode;
 
     @Column(name = "result_code")
     private String resultCode;
@@ -42,6 +48,10 @@ public class B2CTransaction {
 
     @Column(name = "status", nullable = false)
     private String status;
+
+    // ADDED: Required for Maker-Checker tracking
+    @Column(name = "initiated_by")
+    private String initiatedBy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
