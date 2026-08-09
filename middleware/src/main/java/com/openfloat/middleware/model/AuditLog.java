@@ -34,10 +34,10 @@ public class AuditLog {
     // ==========================================
     // IMMUTABLE CRYPTOGRAPHIC CHAIN
     // ==========================================
-    @Column(nullable = false, length = 64)
+    @Column(name = "previous_hash", nullable = true, length = 64)
     private String previousHash;
 
-    @Column(nullable = false, length = 64)
+    @Column(name = "current_hash", nullable = true, length = 64)
     private String currentHash;
 
     public AuditLog() {}
