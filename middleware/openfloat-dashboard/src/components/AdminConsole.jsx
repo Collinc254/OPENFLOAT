@@ -37,7 +37,7 @@ export default function AdminConsole() {
   // User Creation State
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState('STAFF'); 
+  const [showPassword, setShowPassword] = useState(false); // ADDED: Toggle state for password visibility
   const [creationStatus, setCreationStatus] = useState('');
 
   // User List State
@@ -178,7 +178,7 @@ export default function AdminConsole() {
         body: JSON.stringify({
           username: newUsername,
           password: newPassword,
-          role: selectedRole
+          role: 'STAFF' // Automatically default new users to the base STAFF role
         }),
       });
 
@@ -187,6 +187,7 @@ export default function AdminConsole() {
       setCreationStatus('User created successfully!');
       setNewUsername('');
       setNewPassword('');
+      setShowPassword(false); // Reset password visibility
       fetchUsers();
       
     } catch (error) {
@@ -420,32 +421,29 @@ export default function AdminConsole() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Temporary Password</label>
-              <input 
-                type="password" 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-slate-700"
-                placeholder="Min. 8 characters"
-                required 
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">System Role</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
-                <select 
-                  value={selectedRole} 
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-slate-700 font-medium appearance-none"
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-slate-700"
+                  placeholder="Min. 8 characters"
+                  required 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                 >
-                  <option value="STAFF">Staff (Single STK Operations Only)</option>
-                  <option value="MANAGER">Manager (Includes Payouts & Finance Reports)</option>
-                  <option value="ADMIN">Administrator (Full System Access)</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+                  {showPassword ? (
+                    // Eye Slash Icon (Hide)
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                  ) : (
+                    // Eye Icon (Show)
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                  )}
+                </button>
               </div>
             </div>
 
