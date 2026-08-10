@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openfloat.middleware.entity.WebhookDeliveryLog;
 import com.openfloat.middleware.model.WebhookPayload;
 import com.openfloat.middleware.repository.WebhookDeliveryLogRepository;
-// ADDED IMPORT
-import com.openfloat.middleware.service.NotificationService;
+
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;

@@ -19,7 +19,7 @@ export default function Login({ onSuccessfulLogin }) {
     setErrorMsg('');
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://openfloat.onrender.com';
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
       
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
@@ -46,14 +46,14 @@ export default function Login({ onSuccessfulLogin }) {
         localStorage.setItem('role', data.role);
         localStorage.setItem('openfloat_user', username);
         
-        // NEW: Save the permissions array as a stringified JSON object
+        // Save the permissions array as a stringified JSON object
         localStorage.setItem('permissions', JSON.stringify(data.permissions || []));
 
         onSuccessfulLogin({
           username: username,
           role: data.role, 
           token: data.token,
-          // NEW: Pass permissions up to the global state
+          // Save permissions up to the global state
           permissions: data.permissions || []
         });
 

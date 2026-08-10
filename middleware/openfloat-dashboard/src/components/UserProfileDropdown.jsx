@@ -48,7 +48,7 @@ export default function UserProfileDropdown({ user, onNavigate, onLogout }) {
           
           <div className="py-2">
             
-            {/* FIXED: Removed the isAdmin check. All users need access to set up their MFA. */}
+            {/*  All users need access to set up their MFA. */}
             <button
               onClick={() => {
                 onNavigate();

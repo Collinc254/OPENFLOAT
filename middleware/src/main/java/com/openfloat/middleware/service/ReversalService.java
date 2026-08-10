@@ -27,7 +27,7 @@ public class ReversalService {
     private final DarajaAuthService darajaAuthService;
     private final B2CSecurityUtility securityUtility;
     
-    // NEW: Injecting the database configuration repository
+    //  Injecting the database configuration repository
     private final PaybillConfigurationRepository paybillRepository;
 
     @Value("${safaricom.daraja.reversal-result-url}")

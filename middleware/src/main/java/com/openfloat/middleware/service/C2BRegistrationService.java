@@ -27,7 +27,7 @@ public class C2BRegistrationService {
     private String shortcode;
 
     public void registerUrls() {
-        // FIX: Pass the shortcode to fetch the dynamic token for this specific paybill
+        // Pass the shortcode to fetch the dynamic token for this specific paybill
         String accessToken = darajaAuthService.getAccessToken(shortcode);
 
         Map<String, String> payload = new HashMap<>();

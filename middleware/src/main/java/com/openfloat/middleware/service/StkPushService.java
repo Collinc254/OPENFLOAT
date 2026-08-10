@@ -11,7 +11,7 @@ import com.openfloat.middleware.entity.PaybillConfiguration;
 import com.openfloat.middleware.repository.PaymentReferenceRepository;
 import com.openfloat.middleware.repository.TransactionRepository;
 import com.openfloat.middleware.repository.PaybillConfigurationRepository;
-import com.openfloat.middleware.service.NotificationService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -33,7 +33,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class StkPushService {
 
-    // Removed static credential @Values. Keeping global routing URLs.
+    // global routing URLs.
     @Value("${safaricom.daraja.auth-url:https://sandbox.safaricom.co.ke/oauth/v1/generate}")
     private String authUrl;
 
@@ -50,14 +50,14 @@ public class StkPushService {
     private final PaymentReferenceRepository referenceRepository;
     private final NotificationService notificationService;
     
-    // NEW: Inject dynamic paybill configurations
+    // Dynamic paybill configurations
     private final PaybillConfigurationRepository paybillRepository;
 
     public DarajaStkPushResponse sendPush(StkPushRequest request) {
         
-        // ==========================================
-        // PREVENT DUPLICATE REQUESTS (RACE CONDITIONS)
-        // ==========================================
+        
+        // PREVENT DUPLICATE REQUESTS 
+        
         if (transactionRepository.existsById(request.invoiceRef())) {
             log.warn("Blocked duplicate STK Push request for Invoice Ref: {}", request.invoiceRef());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A transaction with this invoice reference is already processing.");

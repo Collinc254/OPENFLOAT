@@ -32,7 +32,7 @@ export default function App() {
     localStorage.removeItem('permissions');
   };
 
-  // === NEW: GRANULAR PERMISSION CHECKER ===
+  // === GRANULAR PERMISSION CHECKER ===
   const hasPermission = (requiredPermission) => {
     if (!user) return false;
     if (user.role === 'ADMIN') return true; // Admins bypass all restrictions

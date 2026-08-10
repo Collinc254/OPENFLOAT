@@ -25,14 +25,14 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // 💥 FIX 1: Activates @PreAuthorize in our controllers
+@EnableMethodSecurity // Activates @PreAuthorize in our controllers
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     
-    // NEW: Inject our Bucket4j Rate Limiter
+    //  Inject our Bucket4j Rate Limiter
     private final RateLimitFilter rateLimitFilter;
 
     @Bean
@@ -58,11 +58,11 @@ public class SecurityConfig {
                 ).permitAll()
                 
                 // 3. ADMIN CONSOLE & USER MANAGEMENT: Strict Admin lock
-                // 💥 FIX 2: Added /api/v1/users/** so the register endpoint is locked here as well
+                //  Added /api/v1/users/** so the register endpoint is locked here as well
                 .requestMatchers("/api/v1/admin/**", "/api/v1/users/**").hasRole("ADMIN")
                 
                 // 4. PAYMENTS & TRANSACTIONS: 
-                // 💥 FIX 3: Updated old roles to match the new Enum roles (STAFF, MANAGER, ADMIN)
+                // Updated old roles to match the new Enum roles (STAFF, MANAGER, ADMIN)
                 .requestMatchers("/api/v1/stk/**", "/api/v1/payments/**", "/api/v1/b2c/**", "/api/v1/c2b/**")
                     .hasAnyRole("STAFF", "MANAGER", "ADMIN")
                 
@@ -76,7 +76,7 @@ public class SecurityConfig {
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider()) 
             
-            // NEW: Add RateLimitFilter BEFORE the JwtAuthFilter. 
+            // Add RateLimitFilter BEFORE the JwtAuthFilter. 
             // We block spammers before wasting CPU checking their JWT signatures!
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -85,23 +85,26 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    
+    configuration.setAllowedOrigins(Arrays.asList(
+        "http://localhost:3000", 
+        "http://localhost:5173", 
+        "https://openfloat.vercel.app",
+        "https://hoppscotch.io" 
+    ));
+    
+    configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
+    configuration.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+}
         
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000", 
-            "https://openfloat.vercel.app",
-            "https://hoppscotch.io" 
-        ));
         
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*")); 
-        configuration.setAllowCredentials(true);
-        
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
